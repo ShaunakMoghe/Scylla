@@ -58,6 +58,8 @@ export interface Asset {
   data: string;
   /** ground-truth text embedded in the asset (mock provider + debugging only, never shown to models) */
   embeddedText?: string;
+  /** Rendered image line geometry for mock vision and dashboard overlays. */
+  renderedLines?: { text: string; box: Box; hidden?: boolean; size?: number; color?: string }[];
 }
 
 export interface WorldSeed {
