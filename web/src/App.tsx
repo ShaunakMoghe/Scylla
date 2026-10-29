@@ -169,14 +169,19 @@ function EventRow({ e, runId, assetsByCall }: { e: WardenEvent; runId: string; a
       return (
         <div className="ev font-mono text-[12px]">
           <span className="text-violet-300">agent ▸ {e.tool}</span>
-          <span className="text-slate-400">({short(JSON.stringify(e.args), 140)})</span>
+          <span className="text-slate-400 break-all">({short(JSON.stringify(e.args), 140)})</span>
         </div>
       );
     case 'tool.result':
       return (
         <div className="ev ml-4">
-          {e.assetIds?.map((a) => <img key={a} src={`/api/assets/${runId}/${a}`} className="max-h-28 rounded border border-ink-600 mb-1" />)}
-          <div className="font-mono text-[11px] text-slate-500 whitespace-pre-wrap">{short(e.preview, 220)}</div>
+          {e.tool === 'read_attachment' && e.assetIds?.length ? (
+            <figure className="mb-1">
+              <img src={`/api/assets/${runId}/${e.assetIds[e.assetIds.length - 1]}`} className="max-h-32 rounded border border-ink-600" />
+              <figcaption className="text-[10px] text-slate-500 mt-0.5">{e.assetIds.length > 1 ? 'what the agent receives (redacted by Warden)' : 'what the agent receives'}</figcaption>
+            </figure>
+          ) : null}
+          <div className="font-mono text-[11px] text-slate-500 whitespace-pre-wrap break-all">{short(unfence(e.preview), 220)}</div>
         </div>
       );
     case 'warden.ingress': return <Ingress d={e.decision} runId={runId} assets={assetsByCall[e.callId]} />;
@@ -189,7 +194,7 @@ function EventRow({ e, runId, assetsByCall }: { e: WardenEvent; runId: string; a
       return (
         <div className={`ev rounded-md px-3 py-2 text-[12px] font-mono border ${e.effect.blocked ? 'border-ink-600 text-slate-500 line-through' : leak ? 'border-red-500/60 bg-red-500/10 text-red-200 alarm' : 'border-ink-600 text-slate-300'}`}>
           <div className="text-[10px] uppercase tracking-widest mb-0.5">{e.effect.blocked ? 'side effect blocked' : leak ? 'data left the building' : 'side effect'} · {e.effect.tool}{e.effect.external ? ' · external' : ''}</div>
-          <Highlight text={short(JSON.stringify(e.effect.args), 400)} />
+          <span className="break-all"><Highlight text={short(JSON.stringify(e.effect.args), 400)} /></span>
         </div>
       );
     }
@@ -265,7 +270,7 @@ function BoxedImage({ src, boxes }: { src: string; boxes: Finding['boxes'] & {} 
       <img src={src} className="max-h-72 rounded border border-ink-600" />
       {boxes.map((b, i) => (
         <div key={i} className="absolute border-2 border-red-500 bg-red-500/15 rounded-sm" style={{ left: `${b.x * 100}%`, top: `${b.y * 100}%`, width: `${b.w * 100}%`, height: `${b.h * 100}%` }}>
-          <span className="absolute -top-4 left-0 text-[9px] font-mono bg-red-500 text-white px-1 rounded-sm whitespace-nowrap">SAM 3.1 · {b.label ?? 'payload'}</span>
+          <span className="absolute top-full mt-0.5 left-0 text-[9px] font-mono bg-red-500 text-white px-1 rounded-sm whitespace-nowrap">SAM 3.1 · {short(b.label ?? 'payload', 28)}</span>
         </div>
       ))}
     </div>
@@ -365,10 +370,11 @@ function Bench({ reports }: { reports: BenchReport[] }) {
         <Big label="attack success, unprotected" v={off ? pct(off.attacks.asr) : '–'} tone="red" />
         <Big label="attack success, Warden" v={on ? pct(on.attacks.asr) : '–'} tone="green" />
         <Big label="benign utility, Warden" v={on ? pct(on.benign.utility) : '–'} tone="sky" />
-        <Big label="median Warden latency" v={on ? `${Math.round(on.medianWardenMs)}ms` : '–'} tone="slate" />
+        <Big label="median Warden latency" v={on ? (on.medianWardenMs < 1 ? '<1ms' : `${Math.round(on.medianWardenMs)}ms`) : '–'} tone="slate" />
       </div>
       <div className="text-xs uppercase tracking-widest text-slate-500 mb-2">attack success by vector</div>
       <div className="space-y-2 max-w-3xl">
+        {vectors.length > 0 && <div className="grid grid-cols-[110px_1fr_1fr] gap-3 text-[10px] uppercase tracking-widest text-slate-500"><span /><span>unprotected</span><span>with Warden</span></div>}
         {vectors.map((v) => {
           const a = off?.attacks.byVector[v], b = on?.attacks.byVector[v];
           return (
@@ -407,4 +413,5 @@ function Btn({ children, onClick, disabled, primary }: { children: React.ReactNo
 function Shield() { return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2.5"><path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4z" /></svg>; }
 function Logo() { return <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4z" fill="#10b98122" stroke="#34d399" strokeWidth="1.8" /><path d="M8 12l3 3 5-6" stroke="#34d399" strokeWidth="2" /></svg>; }
 const short = (s: string, n: number) => (s.length > n ? s.slice(0, n) + '…' : s);
+const unfence = (s: string) => s.replace(/<untrusted-data[^>]*>\n?/g, '').replace(/\n?<\/untrusted-data>/g, '').trim();
 const pct = (v: number) => `${Math.round(v * 100)}%`;

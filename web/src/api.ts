@@ -27,6 +27,7 @@ const empty: Store = { connected: false, status: null, runs: {}, runOrder: [], r
 export function useWarden() {
   const [store, setStore] = useState<Store>(empty);
   const waiters = useRef(new Map<string, (e: WardenEvent) => void>());
+  const ended = useRef(new Set<string>());
 
   useEffect(() => {
     let ws: WebSocket | null = null;
@@ -34,12 +35,12 @@ export function useWarden() {
     const connect = () => {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
       ws = new WebSocket(`${proto}://${location.host}/ws`);
-      ws.onopen = () => setStore((s) => ({ ...s, connected: true }));
+      ws.onopen = () => { ended.current.clear(); setStore((s) => ({ ...s, connected: true, runs: {}, runOrder: [], rounds: [], hardenLog: [] })); };
       ws.onclose = () => { setStore((s) => ({ ...s, connected: false })); if (!closed) setTimeout(connect, 1500); };
       ws.onmessage = (m) => {
         let e: WardenEvent;
         try { e = JSON.parse(m.data); } catch { return; }
-        if (e.type === 'run.end') waiters.current.get(e.runId)?.(e);
+        if (e.type === 'run.end') { ended.current.add(e.runId); waiters.current.get(e.runId)?.(e); }
         setStore((s) => reduce(s, e));
       };
     };
@@ -55,6 +56,7 @@ export function useWarden() {
     return r?.runId ?? null;
   };
   const waitEnd = (runId: string) => new Promise<void>((res) => {
+    if (ended.current.has(runId)) return res();
     waiters.current.set(runId, () => { waiters.current.delete(runId); res(); });
   });
   return { store, run, waitEnd };
