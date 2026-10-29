@@ -288,6 +288,7 @@ function Timings({ t }: { t: { layer: string; ms: number; model?: string }[] }) 
 function Harden({ store }: { store: ReturnType<typeof useWarden>['store'] }) {
   const [busy, setBusy] = useState(false);
   const rounds = [...store.rounds].sort((a, b) => a.round - b.round);
+  useEffect(() => { document.getElementById('log-end')?.scrollIntoView({ block: 'end' }); }, [store.hardenLog.length]);
   return (
     <div className="flex-1 min-h-0 grid grid-cols-[1fr_420px]">
       <div className="overflow-y-auto p-5 space-y-4">
@@ -329,6 +330,7 @@ function Harden({ store }: { store: ReturnType<typeof useWarden>['store'] }) {
           {store.hardenLog.map((l, i) => (
             <div key={i} className="ev"><span className={l.phase === 'red' ? 'text-red-300' : l.phase === 'blue' ? 'text-sky-300' : l.phase === 'verify' ? 'text-emerald-300' : 'text-slate-400'}>[{l.phase}]</span> <span className="text-slate-300">{l.text}</span></div>
           ))}
+          <div id="log-end" />
         </div>
         <div className="px-4 py-2 text-[10px] uppercase tracking-widest text-slate-500 border-t border-ink-700">policy v{store.policy?.version ?? 0} · {store.policy?.rules.length ?? 0} learned rules</div>
       </aside>
@@ -336,21 +338,31 @@ function Harden({ store }: { store: ReturnType<typeof useWarden>['store'] }) {
   );
 }
 
-function AsrCurve({ rounds }: { rounds: { round: number; asrBefore: number; asrAfter: number }[] }) {
-  if (!rounds.length) return <div className="rounded-lg border border-dashed border-ink-600 p-6 text-sm text-slate-500 text-center">No rounds yet.</div>;
-  const W = 600, H = 120, n = rounds.length;
-  const x = (i: number) => 30 + (i * (W - 60)) / Math.max(1, n - 1);
-  const y = (v: number) => 10 + (1 - v) * (H - 30);
-  const path = (k: 'asrBefore' | 'asrAfter') => rounds.map((r, i) => `${i ? 'L' : 'M'}${x(i)},${y(r[k])}`).join(' ');
+function AsrCurve({ rounds }: { rounds: { round: number; asrBefore: number; asrAfter: number; policyVersionAfter: number }[] }) {
+  if (!rounds.length) return <div className="rounded-lg border border-dashed border-ink-600 p-6 text-sm text-slate-500 text-center">No rounds yet. Run the loop to watch the red team attack and the blue team patch.</div>;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-3xl">
-      <path d={path('asrBefore')} stroke="#f87171" fill="none" strokeWidth="2" />
-      <path d={path('asrAfter')} stroke="#34d399" fill="none" strokeWidth="2" />
-      {rounds.map((r, i) => <text key={i} x={x(i)} y={H - 4} fontSize="10" fill="#64748b" textAnchor="middle">R{r.round}</text>)}
-      <text x={W - 30} y={y(rounds[n - 1].asrBefore) - 4} fontSize="10" fill="#f87171" textAnchor="end">new-attack ASR before patch</text>
-      <text x={W - 30} y={y(rounds[n - 1].asrAfter) + 12} fontSize="10" fill="#34d399" textAnchor="end">after verified patch</text>
-    </svg>
+    <div className="rounded-lg border border-ink-700 bg-ink-900 p-4">
+      <div className="text-[10px] uppercase tracking-widest text-slate-500 mb-3">attack success on each round's new attacks</div>
+      <div className="flex items-end gap-8 h-36">
+        {rounds.map((r) => (
+          <div key={r.round} className="flex flex-col items-center gap-1">
+            <div className="flex items-end gap-1.5 h-28">
+              <Col frac={r.asrBefore} color="bg-red-500/80" label={pct(r.asrBefore)} />
+              <Col frac={r.asrAfter} color="bg-emerald-500/80" label={pct(r.asrAfter)} />
+            </div>
+            <div className="text-[11px] text-slate-400 font-mono">R{r.round} → v{r.policyVersionAfter}</div>
+          </div>
+        ))}
+        <div className="ml-auto text-[11px] space-y-1 self-start">
+          <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 bg-red-500/80 rounded-sm" />before patch</div>
+          <div className="flex items-center gap-2"><span className="w-2.5 h-2.5 bg-emerald-500/80 rounded-sm" />after verified patch</div>
+        </div>
+      </div>
+    </div>
   );
+}
+function Col({ frac, color, label }: { frac: number; color: string; label: string }) {
+  return <div className="w-9 flex flex-col items-center justify-end h-full"><span className="text-[10px] font-mono text-slate-300 mb-0.5">{label}</span><div className={`w-full rounded-t ${color}`} style={{ height: `${Math.max(frac * 100, 2)}%` }} /></div>;
 }
 
 function Bench({ reports }: { reports: BenchReport[] }) {
