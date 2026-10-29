@@ -6,31 +6,59 @@ function escapeXml(text: string): string {
   return text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&apos;');
 }
 
+function wrapText(text: string, maxCharacters: number): string[] {
+  const lines: string[] = [];
+  let line = '';
+  for (const word of text.trim().split(/\s+/).filter(Boolean)) {
+    let remaining = word;
+    while (remaining.length > maxCharacters) {
+      if (line) {
+        lines.push(line);
+        line = '';
+      }
+      lines.push(remaining.slice(0, maxCharacters));
+      remaining = remaining.slice(maxCharacters);
+    }
+    if (line && line.length + remaining.length + 1 > maxCharacters) {
+      lines.push(line);
+      line = remaining;
+    } else {
+      line = line ? `${line} ${remaining}` : remaining;
+    }
+  }
+  if (line) lines.push(line);
+  return lines.length ? lines : [''];
+}
+
 export async function renderImage(spec: ImageSpec): Promise<Asset> {
   const width = 900;
+  const margin = 18;
+  const textWidth = width - margin * 2;
   const top = 70;
   const rowHeight = 42;
-  const height = Math.max(180, top + spec.lines.length * rowHeight + 35);
-  const renderedLines = spec.lines.map((line, index) => {
+  const lines = spec.lines.flatMap((line) => {
     const size = Math.max(5, Math.min(38, line.size ?? 18));
+    const maxCharacters = Math.max(1, Math.floor(textWidth / (size * 0.56)));
+    return wrapText(line.text, maxCharacters).map((text) => ({ text, size, hidden: line.hidden, color: line.color }));
+  });
+  const height = Math.max(180, top + lines.length * rowHeight + 35);
+  const renderedLines = lines.map((line, index) => {
     const y = top + index * rowHeight;
-    const textWidth = Math.min(width - 36, Math.max(18, line.text.length * size * 0.56));
-    const x = 18;
+    const lineWidth = Math.min(textWidth, Math.max(18, line.text.length * line.size * 0.56));
     return {
       text: line.text,
-      box: { x: x / width, y: (y - size) / height, w: textWidth / width, h: Math.min(rowHeight, size * 1.35) / height },
+      box: { x: margin / width, y: (y - line.size) / height, w: lineWidth / width, h: Math.min(rowHeight, line.size * 1.35) / height },
       hidden: line.hidden,
-      size,
+      size: line.size,
       color: line.color,
     };
   });
-  const linesSvg = spec.lines.map((line, index) => {
-    const size = Math.max(5, Math.min(38, line.size ?? 18));
+  const linesSvg = lines.map((line, index) => {
     const opacity = line.hidden ? '0.045' : '1';
     const y = top + index * rowHeight;
-    const textWidth = Math.min(width - 36, Math.max(18, line.text.length * size * 0.56));
-    const backing = spec.generatedImage ? `<rect x="12" y="${y - size - 5}" width="${textWidth + 12}" height="${size + 9}" fill="#f7f4ed" opacity="0.9"/>` : '';
-    return `${backing}<text x="18" y="${y}" font-family="Arial, sans-serif" font-size="${size}" fill="${escapeXml(line.color ?? '#262626')}" opacity="${opacity}">${escapeXml(line.text)}</text>`;
+    const lineWidth = Math.min(textWidth, Math.max(18, line.text.length * line.size * 0.56));
+    const backing = spec.generatedImage ? `<rect x="${margin - 6}" y="${y - line.size - 5}" width="${lineWidth + 12}" height="${line.size + 9}" fill="#f7f4ed" opacity="0.9"/>` : '';
+    return `${backing}<text x="${margin}" y="${y}" font-family="Arial, sans-serif" font-size="${line.size}" fill="${escapeXml(line.color ?? '#262626')}" opacity="${opacity}">${escapeXml(line.text)}</text>`;
   }).join('');
   const background = spec.generatedImage ? Buffer.from(spec.generatedImage, 'base64') : undefined;
   let generated: Buffer | undefined;
@@ -42,7 +70,7 @@ export async function renderImage(spec: ImageSpec): Promise<Asset> {
       generated = undefined;
     }
   }
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${generated ? '' : '<rect width="100%" height="100%" fill="#f7f4ed"/>'}<text x="18" y="35" font-family="Arial, sans-serif" font-size="11" fill="${generated ? '#ffffff' : '#b4aea2'}">${escapeXml(spec.scene.slice(0, 120))}</text>${linesSvg}</svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${generated ? '' : '<rect width="100%" height="100%" fill="#f7f4ed"/>'}${linesSvg}</svg>`;
   const overlay = Buffer.from(svg);
   const data = generated
     ? await sharp(generated).resize(width, height, { fit: 'cover' }).composite([{ input: overlay }]).png().toBuffer()

@@ -20,6 +20,8 @@ describe('enforce-mode image redaction', () => {
     const redacted = result.world.assets[`${assetId}-redacted`];
     expect(original).toBeDefined();
     expect(redacted).toBeDefined();
+    expect(original!.renderedLines!.length).toBeGreaterThan(scenario!.patch.imageSpecs![0]!.lines.length);
+    expect(original!.renderedLines!.every((line) => line.box.x + line.box.w <= 1)).toBe(true);
     expect(redacted!.data).not.toBe(original!.data);
     expect(redacted!.renderedLines?.some((line) => line.text.includes('NOTE TO AI ASSISTANT'))).toBe(false);
     expect(result.world.outbox).toHaveLength(0);
