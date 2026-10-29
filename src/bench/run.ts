@@ -1,15 +1,16 @@
 import { randomUUID } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Finding, PolicyVersion, RunResult, Scenario, ToolName, WardenEvent, World } from '../shared/types.js';
-import type { EventSink, ModelProvider, WorldToolResult } from '../model/provider.js';
+import type { EventSink, ModelProvider, RenderedLine, WorldToolResult } from '../model/provider.js';
 import { selectedProviderKind } from '../model/provider.js';
 import { MockProvider } from '../model/mock.js';
 import { LiveProvider } from '../model/live.js';
 import { runLiveAgent } from '../agent/loop.js';
 import { runMockAgent } from '../agent/mockAgent.js';
 import { buildWorld, ensureNoTemplates } from '../world/world.js';
+import { redactImageAsset } from '../world/assets.js';
 import { executeRead, isActionTool, recordSideEffect } from '../world/tools.js';
 import { inspectIngress } from '../warden/ingress.js';
 import { inspectEgress } from '../warden/egress.js';
@@ -23,8 +24,17 @@ type EventInput = WardenEvent extends infer Event
     : never
   : never;
 
-export async function loadScenarios(): Promise<Scenario[]> {
-  return JSON.parse(await readFile(resolve(root, 'bench/corpus/scenarios.json'), 'utf8')) as Scenario[];
+export async function loadScenarios(generatedDir = resolve(root, 'bench/corpus/generated')): Promise<Scenario[]> {
+  const seed = JSON.parse(await readFile(resolve(root, 'bench/corpus/scenarios.json'), 'utf8')) as Scenario[];
+  let names: string[];
+  try {
+    names = (await readdir(generatedDir)).filter((name) => /^round-\d+\.json$/.test(name));
+  } catch {
+    return seed;
+  }
+  names.sort((left, right) => Number(left.match(/\d+/)?.[0]) - Number(right.match(/\d+/)?.[0]));
+  const generated = await Promise.all(names.map(async (name) => JSON.parse(await readFile(resolve(generatedDir, name), 'utf8')) as Scenario[]));
+  return [...seed, ...generated.flat()];
 }
 
 export interface RunScenarioOptions {
@@ -37,6 +47,7 @@ export interface RunScenarioOptions {
   benchmark?: boolean;
   approve?: (input: { approvalId: string; callId: string; tool: string; args: Record<string, unknown> }) => Promise<boolean>;
   onWorld?: (runId: string, world: World) => void;
+  runId?: string;
 }
 
 function stringify(value: unknown): string {
@@ -57,13 +68,19 @@ function trustFor(tool: string): 'trusted' | 'internal' | 'untrusted' {
   return 'untrusted';
 }
 
-export async function runScenario(options: RunScenarioOptions): Promise<RunResult & { world: World }> {
+export interface RunScenarioExecution extends RunResult {
+  world: World;
+  ingressInputs: Record<string, { source: string; text: string }>;
+}
+
+export async function runScenario(options: RunScenarioOptions): Promise<RunScenarioExecution> {
   const provider = options.provider ?? (selectedProviderKind() === 'live' ? new LiveProvider() : new MockProvider());
-  const runId = randomUUID();
+  const runId = options.runId ?? randomUUID();
   const world = await buildWorld(options.scenario, runId);
   options.onWorld?.(runId, world);
   ensureNoTemplates(world);
   const trace: WardenEvent[] = [];
+  const ingressInputs: Record<string, { source: string; text: string }> = {};
   const emit = async (event: EventInput) => {
     const full = { ...event, runId, ts: Date.now() } as WardenEvent;
     trace.push(full);
@@ -86,6 +103,7 @@ export async function runScenario(options: RunScenarioOptions): Promise<RunResul
       const result = executeRead(world, tool, args);
       const source = sourceFor(toolName, args, result);
       const rawText = stringify(result.value);
+      ingressInputs[callId] = { source, text: rawText };
       const voicemail = toolName === 'transcribe_voicemail'
         ? world.voicemails.find((item) => item.id === String(args.id ?? ''))
         : undefined;
@@ -108,14 +126,33 @@ export async function runScenario(options: RunScenarioOptions): Promise<RunResul
       if (inspection.decision.verdict !== 'allow') ingressFlags += 1;
       provenance.push({ source, trust: inspection.decision.trust, findings: inspection.decision.findings });
       await emit({ type: 'warden.ingress', callId, decision: inspection.decision });
+      let assetIds = result.assetIds;
+      let attachment = result.attachment;
+      const boxes = options.mode === 'enforce'
+        ? inspection.decision.findings.filter((finding) => finding.layer === 'vision').flatMap((finding) => finding.boxes ?? [])
+        : [];
+      if (result.attachment && boxes.length) {
+        const original = world.assets[result.attachment.assetId];
+        if (original) {
+          const redacted = await redactImageAsset(original, boxes);
+          world.assets[redacted.id] = redacted;
+          attachment = {
+            assetId: redacted.id,
+            mime: redacted.mime,
+            data: Buffer.from(redacted.data, 'base64'),
+            lines: redacted.renderedLines as RenderedLine[] | undefined,
+          };
+          assetIds = [original.id, redacted.id];
+        }
+      }
       const visibleResult: WorldToolResult = {
         value: inspection.content,
-        assetIds: result.assetIds,
-        attachment: result.attachment,
+        assetIds,
+        attachment,
       };
       await emit({
         type: 'tool.result', callId, tool: toolName, preview: inspection.content.slice(0, 500),
-        assetIds: result.assetIds,
+        assetIds,
       });
       return visibleResult;
     }
@@ -209,5 +246,5 @@ export async function runScenario(options: RunScenarioOptions): Promise<RunResul
     finalAnswer: result.finalAnswer,
   };
   await emit({ type: 'run.end', result: summary });
-  return { ...result, world };
+  return { ...result, world, ingressInputs };
 }

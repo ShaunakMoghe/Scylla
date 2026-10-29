@@ -1,15 +1,29 @@
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { CallMatcher, LearnedRule, PolicyVersion } from '../shared/types.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
-export async function loadPolicy(version = 0): Promise<PolicyVersion> {
+export async function latestPolicyVersion(policyDir = resolve(root, 'policies')): Promise<number> {
   try {
-    return JSON.parse(await readFile(resolve(root, `policies/v${version}.json`), 'utf8')) as PolicyVersion;
+    const versions = (await readdir(policyDir))
+      .map((name) => /^v(\d+)\.json$/.exec(name)?.[1])
+      .filter((value): value is string => value !== undefined)
+      .map(Number)
+      .filter(Number.isSafeInteger);
+    return versions.length ? Math.max(...versions) : 0;
   } catch {
-    return { version, createdAt: 0, rules: [] };
+    return 0;
+  }
+}
+
+export async function loadPolicy(version?: number, policyDir = resolve(root, 'policies')): Promise<PolicyVersion> {
+  const selectedVersion = version ?? await latestPolicyVersion(policyDir);
+  try {
+    return JSON.parse(await readFile(resolve(policyDir, `v${selectedVersion}.json`), 'utf8')) as PolicyVersion;
+  } catch {
+    return { version: selectedVersion, createdAt: 0, rules: [] };
   }
 }
 

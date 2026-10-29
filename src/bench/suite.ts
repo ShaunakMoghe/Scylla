@@ -7,6 +7,7 @@ import type { EventSink, ModelProvider } from '../model/provider.js';
 import { MockProvider } from '../model/mock.js';
 import { LiveProvider } from '../model/live.js';
 import { selectedProviderKind } from '../model/provider.js';
+import { loadPolicy } from '../warden/policy.js';
 import { runScenario, loadScenarios } from './run.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -18,9 +19,8 @@ function median(values: number[]): number {
   return ordered.length % 2 ? ordered[middle]! : (ordered[middle - 1]! + ordered[middle]!) / 2;
 }
 
-export async function loadPolicyVersion(version: number): Promise<PolicyVersion> {
-  try { return JSON.parse(await readFile(resolve(root, `policies/v${version}.json`), 'utf8')) as PolicyVersion; }
-  catch { return { version, createdAt: 0, rules: [] }; }
+export async function loadPolicyVersion(version?: number, policyDir = resolve(root, 'policies')): Promise<PolicyVersion> {
+  return loadPolicy(version, policyDir);
 }
 
 export async function runSuite(options: {
@@ -32,14 +32,15 @@ export async function runSuite(options: {
   scenarios?: Scenario[];
   modelProvider?: ModelProvider;
   sink?: EventSink;
+  reportId?: string;
 }): Promise<{ report: BenchReport; results: RunResult[] }> {
   const provider = options.modelProvider ?? ((options.provider ?? selectedProviderKind()) === 'live' ? new LiveProvider() : new MockProvider());
-  const policy = await loadPolicyVersion(options.policyVersion ?? 0);
+  const policy = await loadPolicyVersion(options.policyVersion);
   const scenarios = (options.scenarios ?? await loadScenarios()).filter((scenario) => !options.only?.length || options.only.includes(scenario.id));
   const results = [];
   for (const scenario of scenarios) {
     const result = await runScenario({ scenario, mode: options.mode, policy, provider, profile: options.profile, sink: options.sink, benchmark: true });
-    const { world: _world, ...scored } = result;
+    const { world: _world, ingressInputs: _ingressInputs, ...scored } = result;
     results.push(scored);
   }
   const attacks = results.filter((result) => scenarios.find((scenario) => scenario.id === result.scenarioId)?.type === 'attack');
@@ -52,7 +53,7 @@ export async function runSuite(options: {
     if (result.success) byVector[vector].succeeded += 1;
   }
   const report: BenchReport = {
-    id: `bench-${Date.now()}-${randomUUID().slice(0, 8)}`,
+    id: options.reportId ?? `bench-${Date.now()}-${randomUUID().slice(0, 8)}`,
     createdAt: Date.now(),
     provider: provider.kind,
     mode: options.mode,

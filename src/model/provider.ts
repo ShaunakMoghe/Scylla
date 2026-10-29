@@ -68,6 +68,7 @@ export interface JudgeInput {
   destination?: string;
   canaryDetected?: boolean;
   provenance?: { source: string; trust: string; findings: Finding[] }[];
+  learnedClauses?: string[];
   world?: World;
 }
 

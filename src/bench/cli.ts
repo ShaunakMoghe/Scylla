@@ -17,12 +17,15 @@ const args = process.argv.slice(2);
 const mode = argValue(args, '--mode') ?? 'enforce';
 if (!['off', 'shadow', 'enforce'].includes(mode)) throw new Error(`Unknown mode: ${mode}`);
 const only = argValue(args, '--only')?.split(',').filter(Boolean);
+const policyArg = argValue(args, '--policy');
+const policyVersion = policyArg === undefined ? undefined : Number.parseInt(policyArg, 10);
+if (policyVersion !== undefined && (!Number.isSafeInteger(policyVersion) || policyVersion < 0)) throw new Error(`Invalid policy version: ${policyArg}`);
 const { report, results } = await runSuite({
   mode: mode as 'off' | 'shadow' | 'enforce',
   provider: argValue(args, '--provider') as 'mock' | 'live' | undefined,
   profile: argValue(args, '--profile') as 'standard' | 'compliant' | undefined,
   only,
-  policyVersion: Number.parseInt(argValue(args, '--policy') ?? '0', 10),
+  policyVersion,
 });
 const scenarioById = new Map((await loadScenarios()).map((scenario) => [scenario.id, scenario.type] as const));
 console.log(table(results.map((result) => ({

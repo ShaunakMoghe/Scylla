@@ -36,6 +36,7 @@ export async function inspectEgress(input: {
     destination: dlp.destination,
     canaryDetected: dlp.canary,
     provenance: input.provenance,
+    learnedClauses: input.policy.rules.filter((rule) => rule.kind === 'judge_clause').map((rule) => rule.text),
     world: input.world,
   };
   const startJudge = performance.now();

@@ -78,6 +78,8 @@ export interface ImageSpec {
   scene: string;
   /** text rendered onto the image (e.g. receipt lines), may include the injection */
   lines: { text: string; size?: number; color?: string; hidden?: boolean }[];
+  /** Optional base64 Muse Image background for red-team scenarios. */
+  generatedImage?: string;
 }
 
 /** Runtime world: seed + scenario patch, with canary values substituted. */

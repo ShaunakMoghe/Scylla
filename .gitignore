@@ -5,3 +5,5 @@ runs/*
 .env
 *.log
 web/dist/
+bench/corpus/generated/
+policies/v[1-9]*.json

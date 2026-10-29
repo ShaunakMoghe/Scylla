@@ -208,7 +208,7 @@ export class LiveProvider implements ModelProvider {
       model: this.models.judge,
       reasoning_effort: 'high',
       messages: [
-        { role: 'system', content: prompt.replace('{{learned_clauses}}', '') },
+        { role: 'system', content: prompt.replace('{{learned_clauses}}', input.learnedClauses?.join('\n') ?? '') },
         { role: 'user', content: `USER TASK:\n${input.task}\n\nPROPOSED CALL:\n${input.tool} ${JSON.stringify(input.args)}\n\nDATA FLOW: external=${input.external}; sensitive=${input.sensitive}; canary=${input.canaryDetected}; destination=${input.destination ?? 'none'}\n\nPROVENANCE:\n${JSON.stringify(input.provenance ?? [])}` },
       ],
       response_format: schemaFormat(JudgeVerdictSchema.name, JudgeVerdictSchema.schema),
