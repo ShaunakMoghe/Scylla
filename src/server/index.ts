@@ -75,7 +75,17 @@ app.get('/api/report/:id', async (req, res) => {
     res.status(404).json({ error: 'Report not found' });
   }
 });
-
+app.get('/api/ablation/latest', async (_req, res) => {
+  try {
+    const runsDir = resolve(root, 'runs');
+    const names = (await readdir(runsDir)).filter((name) => /^ablation-\d+\.json$/.test(name));
+    const latest = names.sort((left, right) => Number(right.match(/\d+/)?.[0]) - Number(left.match(/\d+/)?.[0]))[0];
+    if (!latest) return res.status(404).json({ error: 'No ablation report found' });
+    res.json(JSON.parse(await readFile(resolve(runsDir, latest), 'utf8')));
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
 app.get('/api/assets/:runId/:assetId', (req, res) => {
   const asset = runs.get(req.params.runId)?.world.assets[req.params.assetId];
   if (!asset) return res.status(404).json({ error: 'Asset not found' });

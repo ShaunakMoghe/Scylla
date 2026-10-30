@@ -1,4 +1,4 @@
-import type { EgressDecision, Finding, PolicyVersion, ProvenanceEntry, World } from '../shared/types.js';
+import type { EgressDecision, Finding, Layer, PolicyVersion, ProvenanceEntry, World } from '../shared/types.js';
 import type { JudgeInput, ModelProvider } from '../model/provider.js';
 import { scanDlp } from './dlp.js';
 import { matchingRules } from './policy.js';
@@ -9,6 +9,7 @@ export async function inspectEgress(input: {
   tool: string;
   args: Record<string, unknown>;
   mode: 'off' | 'shadow' | 'enforce';
+  layers?: Layer[];
   world: World;
   provider: ModelProvider;
   policy: PolicyVersion;
@@ -16,28 +17,39 @@ export async function inspectEgress(input: {
   provenanceLedger?: ProvenanceEntry[];
 }): Promise<EgressDecision> {
   if (input.mode === 'off') return { tool: input.tool, args: input.args, verdict: 'allow', findings: [], timings: [] };
+  const layerEnabled = (layer: Layer) => input.layers === undefined || input.layers.includes(layer);
   const findings: Finding[] = [];
   const timings: EgressDecision['timings'] = [];
-  const startDlp = performance.now();
-  const dlp = scanDlp(input.world, input.args);
-  if (dlp.sensitive && dlp.external && dlp.destination && !input.task.toLowerCase().includes(dlp.destination.toLowerCase())) {
-    findings.push({ layer: 'dlp', severity: 'high', reason: 'Sensitive data is being sent to an external destination not named in the task.', quote: dlp.matched?.slice(0, 200), confidence: 1 });
+  const dlp = layerEnabled('dlp')
+    ? scanDlp(input.world, input.args)
+    : { sensitive: false, external: false, destination: undefined, canary: false };
+  if (layerEnabled('dlp')) {
+    const startDlp = performance.now();
+    if (dlp.sensitive && dlp.external && dlp.destination && !input.task.toLowerCase().includes(dlp.destination.toLowerCase())) {
+      findings.push({ layer: 'dlp', severity: 'high', reason: 'Sensitive data is being sent to an external destination not named in the task.', quote: dlp.matched?.slice(0, 200), confidence: 1 });
+    }
+    timings.push({ layer: 'dlp', ms: performance.now() - startDlp });
   }
-  timings.push({ layer: 'dlp', ms: performance.now() - startDlp });
   const serialized = JSON.stringify(input.args);
-  const startPolicy = performance.now();
-  const policies = matchingRules(input.policy.rules, 'egress', serialized, input.tool, input.args);
-  findings.push(...policies.map((rule) => ({ layer: 'policy' as const, ruleId: rule.id, severity: rule.kind === 'regex' ? rule.severity : 'high' as const, reason: rule.rationale })));
-  timings.push({ layer: 'policy', ms: performance.now() - startPolicy });
-  const startProvenance = performance.now();
-  const provenance = inspectProvenance({
-    task: input.task,
-    tool: input.tool,
-    args: input.args,
-    world: input.world,
-    ledger: input.provenanceLedger ?? [],
-  });
-  timings.push({ layer: 'provenance', ms: performance.now() - startProvenance });
+  let policies: ReturnType<typeof matchingRules> = [];
+  if (layerEnabled('policy')) {
+    const startPolicy = performance.now();
+    policies = matchingRules(input.policy.rules, 'egress', serialized, input.tool, input.args);
+    findings.push(...policies.map((rule) => ({ layer: 'policy' as const, ruleId: rule.id, severity: rule.kind === 'regex' ? rule.severity : 'high' as const, reason: rule.rationale })));
+    timings.push({ layer: 'policy', ms: performance.now() - startPolicy });
+  }
+  let provenance: ReturnType<typeof inspectProvenance> = { args: [], block: false, askHuman: false };
+  if (layerEnabled('provenance')) {
+    const startProvenance = performance.now();
+    provenance = inspectProvenance({
+      task: input.task,
+      tool: input.tool,
+      args: input.args,
+      world: input.world,
+      ledger: input.provenanceLedger ?? [],
+    });
+    timings.push({ layer: 'provenance', ms: performance.now() - startProvenance });
+  }
   if (provenance.block || provenance.askHuman) {
     findings.push({
       layer: 'provenance',
@@ -57,10 +69,13 @@ export async function inspectEgress(input: {
     learnedClauses: input.policy.rules.filter((rule) => rule.kind === 'judge_clause').map((rule) => rule.text),
     world: input.world,
   };
-  const startJudge = performance.now();
-  const judge = await input.provider.judge(judgeInput);
-  timings.push({ layer: 'judge', ms: performance.now() - startJudge, model: input.provider.models.judge });
-  if (judge.verdict !== 'allow') findings.push({ layer: 'judge', severity: judge.risk === 'high' ? 'high' : 'medium', reason: judge.reason, confidence: judge.risk === 'high' ? 0.95 : 0.7 });
+  let judge: Awaited<ReturnType<ModelProvider['judge']>> = { aligned: true, risk: 'low', verdict: 'allow', reason: 'Judge layer disabled.' };
+  if (layerEnabled('judge')) {
+    const startJudge = performance.now();
+    judge = await input.provider.judge(judgeInput);
+    timings.push({ layer: 'judge', ms: performance.now() - startJudge, model: input.provider.models.judge });
+    if (judge.verdict !== 'allow') findings.push({ layer: 'judge', severity: judge.risk === 'high' ? 'high' : 'medium', reason: judge.reason, confidence: judge.risk === 'high' ? 0.95 : 0.7 });
+  }
   let verdict: EgressDecision['verdict'] = provenance.block
     ? 'block'
     : provenance.askHuman

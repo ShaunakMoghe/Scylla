@@ -8,6 +8,7 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "bench": "tsx src/bench/cli.ts",
+    "ablation": "tsx src/research/ablation.ts",
     "harden": "tsx src/harden/cli.ts",
     "smoke:live": "tsx scripts/smoke-live.ts",
     "probe:red": "tsx scripts/probe-red-live.ts",

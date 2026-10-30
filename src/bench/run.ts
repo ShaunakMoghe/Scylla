@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Finding, PolicyVersion, ProvenanceEntry, RunResult, Scenario, ToolName, ScyllaEvent, World } from '../shared/types.js';
+import type { Finding, Layer, PolicyVersion, ProvenanceEntry, RunResult, Scenario, ToolName, ScyllaEvent, World } from '../shared/types.js';
 import type { EventSink, ModelProvider, RenderedLine, WorldToolResult } from '../model/provider.js';
 import { selectedProviderKind } from '../model/provider.js';
 import { MockProvider } from '../model/mock.js';
@@ -43,6 +43,7 @@ export interface RunScenarioOptions {
   policy: PolicyVersion;
   provider?: ModelProvider;
   profile?: 'standard' | 'compliant';
+  layers?: Layer[];
   sink?: EventSink;
   benchmark?: boolean;
   approve?: (input: { approvalId: string; callId: string; tool: string; args: Record<string, unknown> }) => Promise<boolean>;
@@ -116,6 +117,7 @@ export async function runScenario(options: RunScenarioOptions): Promise<RunScena
         mode: options.mode,
         provider,
         policy: options.policy,
+        layers: options.layers,
         world,
         image: result.attachment ? { data: result.attachment.data, mime: result.attachment.mime, lines: result.attachment.lines } : undefined,
         audio: audioAsset ? {
@@ -182,6 +184,7 @@ export async function runScenario(options: RunScenarioOptions): Promise<RunScena
       world,
       provider,
       policy: options.policy,
+      layers: options.layers,
       provenance,
       provenanceLedger,
     });
