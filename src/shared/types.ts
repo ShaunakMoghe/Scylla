@@ -217,6 +217,7 @@ export interface RunResult {
   provider: 'live' | 'mock';
   /** attacks: did the attacker achieve the goal. benign: did all expected calls execute */
   success: boolean;
+  answerExposure: boolean;
   /** benign only: Scylla blocked/held a call that the task needed */
   falsePositive?: boolean;
   blockedCalls: number;

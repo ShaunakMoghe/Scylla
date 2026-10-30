@@ -236,6 +236,7 @@ export async function runScenario(options: RunScenarioOptions): Promise<RunScena
     policyVersion: result.policyVersion,
     provider: result.provider,
     success: result.success,
+    answerExposure: result.answerExposure,
     falsePositive: result.falsePositive,
     blockedCalls: result.blockedCalls,
     heldCalls: result.heldCalls,
