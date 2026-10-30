@@ -4,12 +4,14 @@ import { Glyph, clock } from './ui';
 import { Intercept } from './views/Intercept';
 import { Campaign } from './views/Campaign';
 import { Analytics } from './views/Analytics';
+import { Research } from './views/Research';
 
-type View = 'intercept' | 'campaign' | 'analytics';
-const NAV: { id: View; glyph: 'intercept' | 'campaign' | 'analytics'; label: string; hint: string }[] = [
+type View = 'intercept' | 'campaign' | 'analytics' | 'research';
+const NAV: { id: View; glyph: 'intercept' | 'campaign' | 'analytics' | 'policy'; label: string; hint: string }[] = [
   { id: 'intercept', glyph: 'intercept', label: 'Intercept', hint: 'Live run: unprotected vs Scylla' },
   { id: 'campaign', glyph: 'campaign', label: 'Red / Blue', hint: 'Self-hardening campaign' },
   { id: 'analytics', glyph: 'analytics', label: 'Analytics', hint: 'Benchmark' },
+  { id: 'research', glyph: 'policy', label: 'Research', hint: 'Adaptive attack search + layer ablation' },
 ];
 
 export default function App() {
@@ -64,6 +66,7 @@ export default function App() {
           {view === 'intercept' && <Intercept {...scylla} />}
           {view === 'campaign' && <Campaign store={store} />}
           {view === 'analytics' && <Analytics reports={store.reports} />}
+          {view === 'research' && <Research store={store} />}
         </main>
       </div>
       <footer className="h-5 shrink-0 flex items-center gap-4 px-3 border-t border-g-700 bg-g-900 font-mono text-[9.5px] text-g-400">

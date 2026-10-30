@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { ScyllaEvent, Scenario, ScyllaMode, RunResult, Finding } from '../../../src/shared/types';
+import type { ScyllaEvent, Scenario, ScyllaMode, RunResult, Finding, EgressDecision } from '../../../src/shared/types';
 import { getJSON, postJSON, type useScylla } from '../api';
 import { LinkGraph, collectCalls, isLeak, type CallInfo } from '../graph';
 import { Panel, Tag, Btn, KV, Glyph, vectorGlyph, toolGlyph, short, unfence, clock, hash, Highlight, type Tone } from '../ui';
@@ -291,6 +291,7 @@ function CallDetail({ call, runId }: { call: CallInfo; runId: string }) {
             <div className="font-mono text-[9.5px] text-g-400 mb-0.5">MUSE SPARK JUDGE · {call.egress.judge.aligned ? 'ALIGNED' : 'MISALIGNED'} · RISK {call.egress.judge.risk.toUpperCase()}</div>
             <div className="text-[12px] text-g-100">{call.egress.judge.reason}</div>
           </div>}
+          {call.egress.provenance && call.egress.provenance.length > 0 && <Provenance p={call.egress.provenance} />}
           <Findings f={call.egress.findings} />
           <Timings t={call.egress.timings} />
           {call.approvalId && call.egress.verdict === 'ask_human' && done === null && (
@@ -335,6 +336,24 @@ function Timings({ t }: { t: { layer: string; ms: number; model?: string }[] }) 
     <div className="mt-2">
       <div className="flex h-1.5 bg-g-800">{t.map((x, i) => <div key={i} title={`${x.layer} ${Math.round(x.ms)}ms`} style={{ width: `${(x.ms / total) * 100}%`, background: ['#3d9df3', '#a77bf3', '#35c48a', '#f2a93b', '#ff4d4d', '#7f8b97'][i % 6] }} />)}</div>
       <div className="flex flex-wrap gap-x-2 mt-1 font-mono text-[9.5px] text-g-400">{t.map((x, i) => <span key={i} title={x.model}>{x.layer} {x.ms < 1 ? '<1' : Math.round(x.ms)}ms</span>)}</div>
+    </div>
+  );
+}
+
+const ORIGIN_TONE: Record<string, Tone> = { task: 'clear', user: 'clear', sender: 'friendly', internal: 'friendly', untrusted: 'hostile', unknown: 'caution' };
+function Provenance({ p }: { p: NonNullable<EgressDecision['provenance']> }) {
+  return (
+    <div className="bg-g-950 border border-intel/40 p-2 mb-1.5">
+      <div className="font-mono text-[9.5px] text-intel mb-1">ARGUMENT PROVENANCE · WHO CHOSE EACH CONTROL VALUE</div>
+      {p.map((a, i) => (
+        <div key={i} className="py-1 border-t border-g-800 first:border-t-0">
+          <div className="flex items-center gap-2 font-mono text-[10.5px]">
+            <span className="text-g-400">{a.arg}</span><span className="text-g-100 truncate">{a.atom}</span>
+            <span className="ml-auto"><Tag tone={ORIGIN_TONE[a.origin] ?? 'muted'}>{a.origin === 'task' ? 'from your task' : a.origin}</Tag></span>
+          </div>
+          {a.sources.slice(0, 1).map((s, j) => <div key={j} className="mt-0.5 font-mono text-[10px] text-g-400"><span className="text-hostile">{s.source}</span> · “{short(s.quote.replace(/\s+/g, ' '), 110)}”</div>)}
+        </div>
+      ))}
     </div>
   );
 }
