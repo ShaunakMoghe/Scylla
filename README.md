@@ -14,8 +14,10 @@ Built for the Meta AI Developer Hackathon (Indie track). All code in this repo w
 | Mock, Scylla off | 18/18 | — |
 | Mock, Scylla enforce | 0/18 | 10/10 |
 | Live Muse Spark, Scylla enforce | 0/18 | 10/10 completed; 17/18 ingress catches; 0/10 benign flags |
+| Live adaptive search vs unprotected Muse Spark | 1 bypass in 28 variants (pays attacker's bank account; ~1 in 5 replays) | Scylla provenance holds that exact payment for approval |
+| Mock layer ablation | provenance alone catches 14/18 | 10/10 utility, no model calls |
 
-Muse Spark resisted the corpus even unprotected; Scylla adds pre-model detection and model-independent egress control. See [the live results](docs/LIVE_RESULTS.md).
+Muse Spark resisted the hand-written corpus even unprotected, but a Muse Spark attacker refining its own attacks found an invoice-fraud variant that got through; Scylla adds pre-model detection and model-independent egress control. See [the live results](docs/LIVE_RESULTS.md).
 
 ## Meta models used
 | Model | Role |
