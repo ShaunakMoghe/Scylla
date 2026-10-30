@@ -3,6 +3,7 @@ import type { ModelProvider, RenderedLine } from '../model/provider.js';
 import { detectHeuristics } from './heuristics.js';
 import { matchingRules } from './policy.js';
 import { fence } from './fence.js';
+import { splitVisionTiles } from './tiles.js';
 
 export interface IngressInput {
   source: string;
@@ -38,13 +39,51 @@ export async function inspectIngress(input: IngressInput): Promise<{ decision: I
     if (input.image) {
       start = performance.now();
       const vision = await input.provider.vision({ source: input.source, image: input.image.data, mime: input.image.mime, renderedLines: input.image.lines });
+      timings.push({ layer: 'vision', ms: performance.now() - start, model: input.provider.models.vision });
       if (vision.injection) {
         const quote = vision.instructions_to_ai[0] ?? vision.hidden_text ?? vision.visible_text;
         let boxes;
-        if (vision.segment_prompt) boxes = await input.provider.segment({ image: input.image.data, mime: input.image.mime, prompt: vision.segment_prompt, lines: input.image.lines });
+        if (vision.segment_prompt) {
+          start = performance.now();
+          boxes = await input.provider.segment({ image: input.image.data, mime: input.image.mime, prompt: vision.segment_prompt, lines: input.image.lines });
+          timings.push({ layer: 'segment', ms: performance.now() - start, model: input.provider.models.vision });
+        }
         findings.push({ layer: 'vision', severity: vision.confidence >= 0.85 ? 'high' : 'medium', reason: 'Image contains text instructing the assistant.', quote, confidence: vision.confidence, boxes });
+      } else if (visionTilesEnabled()) {
+        const tiles = await splitVisionTiles(input.image.data, input.image.lines);
+        const results = await Promise.all(tiles.map(async (tile) => {
+          const tileStart = performance.now();
+          const tileVision = await input.provider.vision({
+            source: `${input.source}#tile${tile.index}`,
+            image: tile.image,
+            mime: 'image/png',
+            renderedLines: tile.lines,
+          });
+          return { tile, vision: tileVision, ms: performance.now() - tileStart };
+        }));
+        for (const result of results) {
+          timings.push({ layer: 'vision', ms: result.ms, model: input.provider.models.vision });
+          if (!result.vision.injection) continue;
+          const quote = result.vision.instructions_to_ai[0] ?? result.vision.hidden_text ?? result.vision.visible_text;
+          const segmentStart = performance.now();
+          let boxes = await input.provider.segment({
+            image: input.image.data,
+            mime: input.image.mime,
+            prompt: result.vision.segment_prompt,
+            lines: input.image.lines,
+          });
+          timings.push({ layer: 'segment', ms: performance.now() - segmentStart, model: input.provider.models.vision });
+          if (!boxes.length) boxes = [{ ...result.tile.fullBox, label: `tile ${result.tile.index}/4` }];
+          findings.push({
+            layer: 'vision',
+            severity: result.vision.confidence >= 0.85 ? 'high' : 'medium',
+            reason: `Tiled vision scan (tile ${result.tile.index}/4) found text instructing the assistant.`,
+            quote,
+            confidence: result.vision.confidence,
+            boxes,
+          });
+        }
       }
-      timings.push({ layer: 'vision', ms: performance.now() - start, model: input.provider.models.vision });
     }
     if (input.audio) {
       start = performance.now();
@@ -65,4 +104,11 @@ export async function inspectIngress(input: IngressInput): Promise<{ decision: I
     sanitized: verdict === 'allow' ? undefined : fence(text, input.source, input.trust, verdict, effective, input.mode),
   };
   return { decision, content: fence(text, input.source, input.trust, verdict, effective, input.mode) };
+}
+
+function visionTilesEnabled(): boolean {
+  const configured = process.env.SCYLLA_VISION_TILES;
+  if (configured === undefined || configured.trim() === '') return true;
+  const count = Number(configured);
+  return Number.isFinite(count) ? count > 0 : true;
 }
