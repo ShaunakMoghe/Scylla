@@ -30,10 +30,10 @@ export function Intercept({ store, run, waitEnd }: Props) {
     setBusy(false);
   };
 
-  const lanes = [pair.off && { id: pair.off, label: 'SUBJECT A · UNPROTECTED' }, pair.on && { id: pair.on, label: 'SUBJECT B · BEHIND WARDEN' }].filter(Boolean) as { id: string; label: string }[];
+  const lanes = [pair.off && { id: pair.off, label: 'A · UNPROTECTED' }, pair.on && { id: pair.on, label: 'B · BEHIND WARDEN' }].filter(Boolean) as { id: string; label: string }[];
 
   return (
-    <div className="flex-1 min-h-0 grid grid-cols-[250px_1fr_340px] gap-px bg-g-700">
+    <div className="flex-1 min-h-0 grid grid-cols-[230px_1fr_310px] 2xl:grid-cols-[260px_1fr_360px] gap-px bg-g-700">
       <Targets scenarios={scenarios} sel={sel} setSel={(s) => { setSel(s); setPair({}); setFocus(null); }} q={q} setQ={setQ} />
       <div className="min-h-0 min-w-0 flex flex-col bg-g-950">
         <div className="shrink-0 bg-g-900 border-b border-g-700 px-3 py-2 flex items-start gap-3">
@@ -42,7 +42,7 @@ export function Intercept({ store, run, waitEnd }: Props) {
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="font-mono text-[10px] text-g-400">{scenario ? `TGT-${hash(scenario.id).slice(0, 6)}` : ''}</span>
+              <span className="font-mono text-[10px] text-g-400 whitespace-nowrap">{scenario ? `TGT-${hash(scenario.id).slice(0, 6)}` : ''}</span>
               <span className="text-g-100 font-medium truncate">{scenario?.title ?? sel}</span>
             </div>
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -133,7 +133,7 @@ function Lane({ label, runId, events, scenario, focus, onFocus, active }: { labe
     <div className={`min-h-0 min-w-0 flex flex-col bg-g-900 ${active ? 'outline outline-1 outline-friendly/40 -outline-offset-1' : ''}`}>
       <header className="h-7 shrink-0 flex items-center gap-2 px-2.5 border-b border-g-700 bg-g-850">
         <span className={`w-1 h-3 ${start?.mode === 'off' ? 'bg-hostile' : 'bg-clear'}`} />
-        <span className="label text-g-200">{label}</span>
+        <span className="label text-g-200 whitespace-nowrap">{label}</span>
         {start && <Tag tone={start.mode === 'off' ? 'hostile' : start.mode === 'shadow' ? 'caution' : 'clear'}>{start.mode === 'off' ? 'no firewall' : start.mode}</Tag>}
         <span className="ml-auto">{o ? <Tag tone={o.tone} solid>{o.text}</Tag> : <span className="font-mono text-[10px] text-caution blink">● EXECUTING</span>}</span>
       </header>
