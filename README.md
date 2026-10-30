@@ -8,6 +8,15 @@ AI agents read our email, browse the web, open images and call real tools. One s
 
 Built for the Meta AI Developer Hackathon (Indie track). All code in this repo was written during the hackathon window.
 
+## Results
+| Run | Attack success | Benign utility and ingress |
+|---|---:|---|
+| Mock, Warden off | 18/18 | — |
+| Mock, Warden enforce | 0/18 | 10/10 |
+| Live Muse Spark, Warden enforce | 0/18 | 10/10 completed; 17/18 ingress catches; 0/10 benign flags |
+
+Muse Spark resisted the corpus even unprotected; Warden adds pre-model detection and model-independent egress control. See [the live results](docs/LIVE_RESULTS.md).
+
 ## Meta models used
 | Model | Role |
 |---|---|
@@ -26,7 +35,7 @@ npm run dev                 # API + WebSocket on :4100 (mock provider when no ke
 npm run bench -- --mode off
 npm run bench -- --mode enforce
 ```
-Live mode: `export MODEL_API_KEY=...` (optional `BASETEN_API_KEY` for the open-weights guard), then run `npm run smoke:live`. `WARDEN_CALL_CAP` (default 400) hard-caps model calls per process; `WARDEN_TIMEOUT_MS` (default 90000) sets the timeout for live API requests.
+Live mode: `export MODEL_API_KEY=...` (optional `BASETEN_API_KEY` for the open-weights guard), then run `npm run smoke:live`. For probes, run `npm run probe:exposure` with `WARDEN_PROVIDER=live`, or `npm run probe:red` (live model calls). `WARDEN_CALL_CAP` (default 400) hard-caps model calls per process; `WARDEN_TIMEOUT_MS` (default 90000) sets the timeout for live API requests.
 
 The sandbox is fictional (Northwind Robotics, `.example` domains). Secrets are runtime-generated canaries, so no side effect ever leaves the process.
 
