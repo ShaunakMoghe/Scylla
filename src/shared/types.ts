@@ -234,6 +234,7 @@ export interface BenchReport {
   createdAt: number;
   provider: 'live' | 'mock';
   mode: WardenMode;
+  profile?: 'standard' | 'compliant';
   policyVersion: number;
   attacks: { total: number; succeeded: number; asr: number; byVector: Record<string, { total: number; succeeded: number }> };
   benign: { total: number; passed: number; falsePositives: number; utility: number; ingressFlags: number };

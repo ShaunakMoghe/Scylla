@@ -17,7 +17,10 @@ export function Analytics({ reports }: { reports: BenchReport[] }) {
       <div className="shrink-0 bg-g-900 border-b border-g-700 px-3 py-2 flex items-center gap-3">
         <div>
           <div className="text-g-100 font-medium">Benchmark · same agent, same corpus</div>
-          <div className="font-mono text-[10.5px] text-g-400">{on ? `LATEST · ${on.provider.toUpperCase()} PROVIDER · POLICY v${on.policyVersion} · ${on.modelCalls} MODEL CALLS · ${new Date(on.createdAt).toISOString().slice(0, 16).replace('T', ' ')}Z` : 'NO REPORTS'}</div>
+          <div className="font-mono text-[10.5px] text-g-400 flex items-center gap-2">
+            <span>{on ? `LATEST · ${on.provider.toUpperCase()} PROVIDER · POLICY v${on.policyVersion} · ${on.modelCalls} MODEL CALLS · ${new Date(on.createdAt).toISOString().slice(0, 16).replace('T', ' ')}Z` : 'NO REPORTS'}</span>
+            {on && <Tag>PROFILE {(on.profile ?? 'standard').toUpperCase()}</Tag>}
+          </div>
         </div>
         <div className="ml-auto flex gap-1.5">
           <Btn danger disabled={busy} onClick={async () => { setBusy(true); await postJSON('/api/bench', { mode: 'off' }); setBusy(false); }}>Run unprotected</Btn>

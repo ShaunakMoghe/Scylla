@@ -28,6 +28,7 @@ const { report, results } = await runSuite({
   policyVersion,
 });
 const scenarioById = new Map((await loadScenarios()).map((scenario) => [scenario.id, scenario.type] as const));
+console.log(`profile: ${report.profile ?? 'standard'}`);
 console.log(table(results.map((result) => ({
   id: result.scenarioId,
   type: scenarioById.get(result.scenarioId) ?? 'unknown',

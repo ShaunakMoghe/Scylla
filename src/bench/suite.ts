@@ -33,6 +33,7 @@ export async function runSuite(options: {
   modelProvider?: ModelProvider;
   sink?: EventSink;
   reportId?: string;
+  reportDirectory?: string;
 }): Promise<{ report: BenchReport; results: RunResult[] }> {
   const provider = options.modelProvider ?? ((options.provider ?? selectedProviderKind()) === 'live' ? new LiveProvider() : new MockProvider());
   const policy = await loadPolicyVersion(options.policyVersion);
@@ -68,6 +69,7 @@ export async function runSuite(options: {
     createdAt: Date.now(),
     provider: provider.kind,
     mode: options.mode,
+    profile: options.profile ?? 'standard',
     policyVersion: policy.version,
     attacks: {
       total: attacks.length,
@@ -87,7 +89,7 @@ export async function runSuite(options: {
     ...(errors.length ? { errors } : {}),
     results: results.map(({ trace: _trace, ...result }) => result),
   };
-  const runsDir = resolve(root, 'runs');
+  const runsDir = options.reportDirectory ?? resolve(root, 'runs');
   await mkdir(runsDir, { recursive: true });
   await writeFile(resolve(runsDir, `${report.id}.json`), `${JSON.stringify(report, null, 2)}\n`);
   await options.sink?.({ type: 'bench.report', runId: report.id, ts: Date.now(), report });
