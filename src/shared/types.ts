@@ -239,6 +239,7 @@ export interface BenchReport {
   benign: { total: number; passed: number; falsePositives: number; utility: number; ingressFlags: number };
   medianWardenMs: number;
   modelCalls: number;
+  errors?: { scenarioId: string; message: string }[];
   results: Omit<RunResult, 'trace'>[];
 }
 

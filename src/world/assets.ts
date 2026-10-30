@@ -135,8 +135,73 @@ function silentWav(): Buffer {
   return wav;
 }
 
+function normalizeWav(wav: Buffer): Buffer | undefined {
+  if (wav.length < 12 || wav.toString('ascii', 0, 4) !== 'RIFF' || wav.toString('ascii', 8, 12) !== 'WAVE') return undefined;
+  let format: number | undefined;
+  let channels: number | undefined;
+  let sampleRate: number | undefined;
+  let blockAlign: number | undefined;
+  let bitsPerSample: number | undefined;
+  let dataOffset: number | undefined;
+  let dataLength = 0;
+  for (let offset = 12; offset + 8 <= wav.length;) {
+    const chunkSize = wav.readUInt32LE(offset + 4);
+    const chunkOffset = offset + 8;
+    if (chunkOffset + chunkSize > wav.length) return undefined;
+    const chunkId = wav.toString('ascii', offset, offset + 4);
+    if (chunkId === 'fmt ' && chunkSize >= 16) {
+      format = wav.readUInt16LE(chunkOffset);
+      channels = wav.readUInt16LE(chunkOffset + 2);
+      sampleRate = wav.readUInt32LE(chunkOffset + 4);
+      blockAlign = wav.readUInt16LE(chunkOffset + 12);
+      bitsPerSample = wav.readUInt16LE(chunkOffset + 14);
+    } else if (chunkId === 'data') {
+      dataOffset = chunkOffset;
+      dataLength = chunkSize;
+    }
+    offset = chunkOffset + chunkSize + (chunkSize % 2);
+  }
+  if (format !== 1 || !channels || !sampleRate || !blockAlign || bitsPerSample !== 16 || !dataOffset || blockAlign < channels * 2) return undefined;
+
+  const frameCount = Math.floor(dataLength / blockAlign);
+  if (!frameCount) return undefined;
+  const outputFrames = Math.max(1, Math.round(frameCount * 24000 / sampleRate));
+  const pcm = Buffer.alloc(outputFrames * 2);
+  for (let frame = 0; frame < outputFrames; frame += 1) {
+    const inputPosition = frame * sampleRate / 24000;
+    const first = Math.min(frameCount - 1, Math.floor(inputPosition));
+    const second = Math.min(frameCount - 1, first + 1);
+    const fraction = inputPosition - first;
+    const sampleAt = (index: number) => {
+      let sum = 0;
+      for (let channel = 0; channel < channels; channel += 1) {
+        sum += wav.readInt16LE(dataOffset! + index * blockAlign! + channel * 2);
+      }
+      return sum / channels;
+    };
+    const sample = Math.round(sampleAt(first) * (1 - fraction) + sampleAt(second) * fraction);
+    pcm.writeInt16LE(Math.max(-32768, Math.min(32767, sample)), frame * 2);
+  }
+
+  const output = Buffer.alloc(44 + pcm.length);
+  output.write('RIFF', 0);
+  output.writeUInt32LE(36 + pcm.length, 4);
+  output.write('WAVEfmt ', 8);
+  output.writeUInt32LE(16, 16);
+  output.writeUInt16LE(1, 20);
+  output.writeUInt16LE(1, 22);
+  output.writeUInt32LE(24000, 24);
+  output.writeUInt32LE(48000, 28);
+  output.writeUInt16LE(2, 32);
+  output.writeUInt16LE(16, 34);
+  output.write('data', 36);
+  output.writeUInt32LE(pcm.length, 40);
+  pcm.copy(output, 44);
+  return output;
+}
+
 export function renderVoicemail(assetId: string, text: string): Asset {
   const result = spawnSync('espeak-ng', ['--stdout', text], { maxBuffer: 16 * 1024 * 1024 });
-  const data = result.status === 0 && result.stdout?.length ? result.stdout : silentWav();
+  const data = result.status === 0 && result.stdout?.length ? normalizeWav(result.stdout) ?? silentWav() : silentWav();
   return { id: assetId, mime: 'audio/wav', data: data.toString('base64'), embeddedText: text };
 }

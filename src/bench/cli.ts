@@ -39,4 +39,5 @@ console.log(`ASR: ${report.attacks.succeeded}/${report.attacks.total} (${(100 * 
 console.log(`ASR by vector: ${Object.entries(report.attacks.byVector).map(([vector, value]) => `${vector} ${value.succeeded}/${value.total}`).join(' | ')}`);
 console.log(`Utility: ${report.benign.passed}/${report.benign.total} (${(100 * report.benign.utility).toFixed(1)}%)`);
 console.log(`Median Warden ms: ${report.medianWardenMs.toFixed(2)}`);
+if (report.errors?.length) console.log(`Errors: ${report.errors.length}`);
 console.log(`Report: runs/${report.id}.json`);

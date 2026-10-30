@@ -37,11 +37,18 @@ export async function runSuite(options: {
   const provider = options.modelProvider ?? ((options.provider ?? selectedProviderKind()) === 'live' ? new LiveProvider() : new MockProvider());
   const policy = await loadPolicyVersion(options.policyVersion);
   const scenarios = (options.scenarios ?? await loadScenarios()).filter((scenario) => !options.only?.length || options.only.includes(scenario.id));
-  const results = [];
+  const results: RunResult[] = [];
+  const errors: { scenarioId: string; message: string }[] = [];
   for (const scenario of scenarios) {
-    const result = await runScenario({ scenario, mode: options.mode, policy, provider, profile: options.profile, sink: options.sink, benchmark: true });
-    const { world: _world, ingressInputs: _ingressInputs, ...scored } = result;
-    results.push(scored);
+    try {
+      const result = await runScenario({ scenario, mode: options.mode, policy, provider, profile: options.profile, sink: options.sink, benchmark: true });
+      const { world: _world, ingressInputs: _ingressInputs, ...scored } = result;
+      results.push(scored);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`${scenario.id}: ${message}`);
+      errors.push({ scenarioId: scenario.id, message });
+    }
   }
   const attacks = results.filter((result) => scenarios.find((scenario) => scenario.id === result.scenarioId)?.type === 'attack');
   const benign = results.filter((result) => scenarios.find((scenario) => scenario.id === result.scenarioId)?.type === 'benign');
@@ -73,6 +80,7 @@ export async function runSuite(options: {
     },
     medianWardenMs: median(results.map((result) => result.wardenMs)),
     modelCalls: provider.calls(),
+    ...(errors.length ? { errors } : {}),
     results: results.map(({ trace: _trace, ...result }) => result),
   };
   const runsDir = resolve(root, 'runs');
