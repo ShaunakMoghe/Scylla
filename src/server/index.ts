@@ -13,6 +13,7 @@ import { createProvider } from '../model/index.js';
 import { loadScenarios, runScenario } from '../bench/run.js';
 import { runSuite, loadPolicyVersion } from '../bench/suite.js';
 import { runHardening } from '../harden/loop.js';
+import { runAdaptiveSearch } from '../research/search.js';
 import { EventBus } from './bus.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -199,6 +200,78 @@ app.post('/api/harden', (req, res) => {
       await publishStatus(hardenId);
     }
   })();
+});
+
+app.post('/api/search', (req, res) => {
+  const body = req.body as {
+    seeds?: string[];
+    target?: 'off' | 'enforce';
+    depth?: number;
+    width?: number;
+    budget?: number;
+    profile?: 'standard' | 'compliant';
+  };
+  const target = body.target ?? 'off';
+  const depth = body.depth ?? 3;
+  const width = body.width ?? 2;
+  const budget = body.budget ?? 150;
+  const profile = body.profile ?? 'standard';
+  if (busy) return res.status(409).json({ error: 'A run is already in progress' });
+  if (body.seeds !== undefined && (!Array.isArray(body.seeds) || body.seeds.some((seed) => typeof seed !== 'string'))) {
+    return res.status(400).json({ error: 'seeds must be an array of scenario ids' });
+  }
+  if (!['off', 'enforce'].includes(target)
+    || !Number.isSafeInteger(depth) || depth < 0 || depth > 10
+    || !Number.isSafeInteger(width) || width < 1 || width > 10
+    || !Number.isSafeInteger(budget) || budget < 0
+    || !['standard', 'compliant'].includes(profile)) {
+    return res.status(400).json({ error: 'Invalid target, depth, width, budget, or profile' });
+  }
+  busy = true;
+  const searchId = `search-${Date.now()}`;
+  res.status(202).json({ searchId });
+  void publishStatus(searchId);
+  void (async () => {
+    try {
+      await runAdaptiveSearch({
+        provider,
+        seeds: body.seeds,
+        target,
+        depth,
+        width,
+        budget,
+        profile,
+        searchId,
+        sink: publish,
+      });
+    } catch (error) {
+      console.error(`Search ${searchId} failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      busy = false;
+      await publishStatus(searchId);
+    }
+  })();
+});
+
+app.get('/api/searches', async (_req, res) => {
+  try {
+    const searchDir = resolve(root, 'runs/search');
+    const names = (await readdir(searchDir)).filter((name) => /^search-\d+\.json$/.test(name));
+    const reports = await Promise.all(names.map(async (name) => JSON.parse(await readFile(resolve(searchDir, name), 'utf8'))));
+    reports.sort((left, right) => right.createdAt - left.createdAt);
+    res.json(reports);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return res.json([]);
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
+  }
+});
+app.get('/api/search/:id', async (req, res) => {
+  try {
+    if (!/^search-\d+$/.test(req.params.id)) return res.status(404).json({ error: 'Search report not found' });
+    res.json(JSON.parse(await readFile(resolve(root, 'runs/search', `${req.params.id}.json`), 'utf8')));
+  } catch {
+    res.status(404).json({ error: 'Search report not found' });
+  }
 });
 
 ws.on('connection', (socket) => {

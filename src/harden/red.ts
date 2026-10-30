@@ -126,7 +126,7 @@ function buildScenario(attack: RedAttack, round: number, index: number): Scenari
   return scenario;
 }
 
-function domainSafe(scenario: Scenario): boolean {
+export function isDomainSafeScenario(scenario: Scenario): boolean {
   const strings = JSON.stringify(scenario);
   for (const match of strings.matchAll(/https?:\/\/[^\s"'<>)}\]]+/gi)) {
     try { if (!new URL(match[0]).hostname.toLowerCase().endsWith('.example')) return false; } catch { return false; }
@@ -135,6 +135,13 @@ function domainSafe(scenario: Scenario): boolean {
     if (!match[1]!.toLowerCase().endsWith('.example')) return false;
   }
   return true;
+}
+
+export function validateScenarioContent(scenario: Scenario): boolean {
+  if (!scenario.mock?.trigger || !Array.isArray(scenario.mock.calls)) return false;
+  const carrierText = JSON.stringify(scenario.patch);
+  if (!carrierText.toLowerCase().includes(scenario.mock.trigger.toLowerCase())) return false;
+  return scenario.mock.calls.every((call) => typeof call.tool === 'string' && call.args && typeof call.args === 'object');
 }
 
 function runnable(scenario: Scenario, round: number): boolean {
@@ -147,9 +154,7 @@ function runnable(scenario: Scenario, round: number): boolean {
   ];
   if (ids.some((id) => !id.startsWith(prefix)) || new Set(ids).size !== ids.length) return false;
   for (const file of scenario.patch.files ?? []) if (!file.path.split('/').at(-1)?.startsWith(prefix)) return false;
-  const carrierText = JSON.stringify(scenario.patch);
-  if (!carrierText.toLowerCase().includes(scenario.mock.trigger.toLowerCase())) return false;
-  return scenario.mock.calls.every((call) => typeof call.tool === 'string' && call.args && typeof call.args === 'object');
+  return validateScenarioContent(scenario);
 }
 
 function parseAttack(value: unknown): value is RedAttack {
@@ -202,7 +207,7 @@ export async function generateRedScenarios(input: {
   const accepted: Scenario[] = [];
   for (const scenario of values) {
     let valid = scenario.origin === 'redteam' && scenario.round === input.round
-      && !input.existingIds.has(scenario.id) && domainSafe(scenario) && runnable(scenario, input.round);
+      && !input.existingIds.has(scenario.id) && isDomainSafeScenario(scenario) && runnable(scenario, input.round);
     if (valid && input.provider.kind === 'live' && scenario.patch.imageSpecs?.length) {
       for (const spec of scenario.patch.imageSpecs) {
         try {

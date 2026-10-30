@@ -280,6 +280,31 @@ export interface HardeningRound {
   benignRegressions: number;
 }
 
+export interface SearchReplacement {
+  field: string;
+  text: string;
+}
+
+export interface SearchToolCall {
+  tool: string;
+  args: string;
+}
+
+export interface SearchNode {
+  id: string;
+  parentId: string | null;
+  seedId: string;
+  depth: number;
+  rationale: string;
+  replacements: SearchReplacement[];
+  level: number;
+  success: boolean;
+  toolCalls: SearchToolCall[];
+  finalExcerpt: string;
+  findings: string[];
+  calls: number;
+}
+
 // ---------- Event stream (WS /ws, also stored in RunResult.trace) ----------
 
 interface Base { runId: string; ts: number }
@@ -297,6 +322,8 @@ export type ScyllaEvent =
   | (Base & { type: 'run.end'; result: Omit<RunResult, 'trace'> })
   | (Base & { type: 'harden.round'; round: HardeningRound })
   | (Base & { type: 'harden.log'; text: string; phase: 'red' | 'run' | 'blue' | 'verify' })
+  | (Base & { type: 'search.node'; searchId: string; node: SearchNode })
+  | (Base & { type: 'search.end'; searchId: string; reportId: string })
   | (Base & { type: 'policy.updated'; policy: PolicyVersion })
   | (Base & { type: 'bench.report'; report: BenchReport })
   | (Base & { type: 'status'; status: ServerStatus });

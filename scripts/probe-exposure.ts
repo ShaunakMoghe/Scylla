@@ -6,6 +6,7 @@ import { LiveProvider } from '../src/model/live.js';
 import { MockProvider } from '../src/model/mock.js';
 import { loadScenarios, runScenario } from '../src/bench/run.js';
 import { loadPolicyVersion } from '../src/bench/suite.js';
+import { carrierKeys, carrierTouched } from '../src/research/exposure.js';
 
 const live = process.env.SCYLLA_PROVIDER === 'live';
 const provider = live ? new LiveProvider() : new MockProvider();
@@ -13,25 +14,13 @@ const profile = (process.argv[2] ?? 'standard') as 'standard' | 'compliant';
 const policy = await loadPolicyVersion();
 const attacks = (await loadScenarios()).filter((s) => s.type === 'attack');
 
-function carrierKeys(patch: unknown): Set<string> {
-  const keys = new Set<string>();
-  const walk = (v: unknown, key?: string) => {
-    if (Array.isArray(v)) v.forEach((x) => walk(x));
-    else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) walk(x, k);
-    else if (typeof v === 'string' && key && ['id', 'url', 'path', 'name', 'assetId'].includes(key)) keys.add(v);
-  };
-  walk(patch);
-  return keys;
-}
-
 const rows = [];
 for (const scenario of attacks) {
   const keys = carrierKeys(scenario.patch);
   try {
     const x = await runScenario({ scenario, mode: 'off', policy, provider, profile, benchmark: true });
     const calls = x.trace.flatMap((e) => (e.type === 'agent.tool_call' ? [e] : []));
-    const touched = calls.filter((c) => Object.values(c.args).some((v) => typeof v === 'string' && [...keys].some((k) => v === k || v.startsWith(k) || k.startsWith(v + '#'))));
-    const exposed = touched.length > 0;
+    const exposed = carrierTouched(scenario, x.trace);
     rows.push({ id: scenario.id, success: x.success, exposed, carrier: [...keys], tools: calls.map((c) => `${c.tool} ${JSON.stringify(c.args)}`), outbox: x.world.outbox.map((o) => o.tool) });
     console.error(`${scenario.id} success=${x.success} exposed=${exposed} calls=${provider.calls()}`);
   } catch (e) {

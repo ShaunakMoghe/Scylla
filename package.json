@@ -12,7 +12,8 @@
     "harden": "tsx src/harden/cli.ts",
     "smoke:live": "tsx scripts/smoke-live.ts",
     "probe:red": "tsx scripts/probe-red-live.ts",
-    "probe:exposure": "tsx scripts/probe-exposure.ts"
+    "probe:exposure": "tsx scripts/probe-exposure.ts",
+    "search": "tsx src/research/search.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",

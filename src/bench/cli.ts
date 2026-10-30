@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { runSuite } from './suite.js';
 import { loadScenarios } from './run.js';
+import { loadExtraScenarios } from './extra.js';
 
 function argValue(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -25,15 +26,21 @@ const policyArg = argValue(args, '--policy');
 const policyVersion = policyArg === undefined ? undefined : Number.parseInt(policyArg, 10);
 if (policyVersion !== undefined && (!Number.isSafeInteger(policyVersion) || policyVersion < 0)) throw new Error(`Invalid policy version: ${policyArg}`);
 const reportDirectory = process.env.SCYLLA_REPORT_DIRECTORY;
+const extraArg = argValue(args, '--extra');
+let scenarios = await loadScenarios();
+if (extraArg) {
+  scenarios = [...scenarios, ...await loadExtraScenarios(extraArg)];
+}
 const { report, results } = await runSuite({
   mode: mode as 'off' | 'shadow' | 'enforce',
   provider: argValue(args, '--provider') as 'mock' | 'live' | undefined,
   profile: argValue(args, '--profile') as 'standard' | 'compliant' | undefined,
   only,
   policyVersion,
+  scenarios,
   reportDirectory,
 });
-const scenarioById = new Map((await loadScenarios()).map((scenario) => [scenario.id, scenario.type] as const));
+const scenarioById = new Map(scenarios.map((scenario) => [scenario.id, scenario.type] as const));
 console.log(`profile: ${report.profile ?? 'standard'}`);
 console.log(table(results.map((result) => ({
   id: result.scenarioId,
