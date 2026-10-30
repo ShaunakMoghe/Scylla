@@ -60,7 +60,16 @@ describe('tiled vision scanning', () => {
       expect(finding!.boxes![0]!.x + finding!.boxes![0]!.w).toBeLessThanOrEqual(1);
       expect(finding!.boxes![0]!.y + finding!.boxes![0]!.h).toBeLessThanOrEqual(1);
       expect(provider.seenSources).toHaveLength(5);
-      expect(result.decision.timings.filter((timing) => timing.layer === 'vision')).toHaveLength(5);
+      const visionTimings = result.decision.timings.filter((timing) => timing.layer === 'vision');
+      expect(visionTimings).toHaveLength(5);
+      expect(visionTimings.map((timing) => [timing.source, timing.injection])).toEqual([
+        ['attachment:e1/receipt.png', false],
+        ['attachment:e1/receipt.png#tile1', false],
+        ['attachment:e1/receipt.png#tile2', false],
+        ['attachment:e1/receipt.png#tile3', true],
+        ['attachment:e1/receipt.png#tile4', false],
+      ]);
+      expect(visionTimings[3]?.hiddenTextExcerpt).toBe('A hidden tile-only instruction');
     } finally {
       if (previous === undefined) delete process.env.SCYLLA_VISION_TILES;
       else process.env.SCYLLA_VISION_TILES = previous;

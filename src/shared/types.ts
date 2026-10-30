@@ -172,7 +172,14 @@ export interface Finding {
 
 export interface Box { x: number; y: number; w: number; h: number; label?: string; score?: number }
 
-export interface LayerTiming { layer: Layer; ms: number; model?: string }
+export interface LayerTiming {
+  layer: Layer;
+  ms: number;
+  model?: string;
+  source?: string;
+  injection?: boolean;
+  hiddenTextExcerpt?: string;
+}
 
 export interface IngressDecision {
   source: string;       // e.g. "email:e3", "web:https://…", "attachment:e3/receipt.png"
@@ -250,6 +257,7 @@ export interface RunResult {
   modelCalls: number;
   scyllaMs: number;
   finalAnswer: string;
+  visionDiagnostics: LayerTiming[];
   trace: ScyllaEvent[];
 }
 

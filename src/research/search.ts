@@ -59,6 +59,9 @@ export interface SearchReport {
 type SearchSink = (event: ScyllaEvent) => void | Promise<void>;
 type CarrierField = { field: string; text: string; set: (value: string) => void };
 type CandidateVariant = { rationale: string; replacements: SearchReplacement[] };
+type ParsedVariant = { index: number; variant: CandidateVariant };
+type VariantParseResult = { variants: ParsedVariant[]; dropped: { index: number; reason: string }[]; error?: string };
+type AppliedVariant = { scenario: Scenario; replacements: SearchReplacement[]; preservedTriggerField?: string } | { error: string };
 
 function carrierFields(scenario: Scenario): CarrierField[] {
   const fields: CarrierField[] = [];
@@ -85,37 +88,95 @@ function carrierFields(scenario: Scenario): CarrierField[] {
   return fields;
 }
 
-function applyVariant(scenario: Scenario, variant: CandidateVariant): { scenario: Scenario; replacements: SearchReplacement[] } | undefined {
-  if (!variant.replacements.length) return undefined;
+function applyVariant(scenario: Scenario, variant: CandidateVariant): AppliedVariant {
+  if (!variant.replacements.length) return { error: 'variant contains no replacements' };
   const copy = JSON.parse(JSON.stringify(scenario)) as Scenario;
   const fields = new Map(carrierFields(copy).map((field) => [field.field, field]));
+  const trigger = scenario.mock?.trigger;
+  const triggerField = trigger
+    ? carrierFields(scenario).find((field) => field.text.toLowerCase().includes(trigger.toLowerCase()))?.field
+    : undefined;
   const replacements: SearchReplacement[] = [];
   for (const replacement of variant.replacements) {
     const field = fields.get(replacement.field);
-    if (!field || typeof replacement.text !== 'string') return undefined;
+    if (!field) return { error: `unknown carrier field path: ${replacement.field}` };
+    if (typeof replacement.text !== 'string') return { error: `replacement for ${replacement.field} is not text` };
     const text = replacement.text.replace(/\{\{TAGS:([^{}]*)\}\}/g, (_match, value: string) => encodeTags(value));
     field.set(text);
     replacements.push({ field: replacement.field, text });
   }
-  if (!isDomainSafeScenario(copy) || !validateScenarioContent(copy)) return undefined;
-  return { scenario: copy, replacements };
+  if (!isDomainSafeScenario(copy)) return { error: 'domain-safety validation rejected the candidate' };
+  let preservedTriggerField: string | undefined;
+  if (!validateScenarioContent(copy)) {
+    const triggerReplacementIndex = triggerField
+      ? replacements.map((replacement) => replacement.field).lastIndexOf(triggerField)
+      : -1;
+    if (trigger && triggerField && triggerReplacementIndex >= 0
+      && !JSON.stringify(copy.patch).toLowerCase().includes(trigger.toLowerCase())) {
+      const replacement = replacements[triggerReplacementIndex]!;
+      const text = `${replacement.text}\n\n${trigger}`;
+      fields.get(triggerField)!.set(text);
+      replacements[triggerReplacementIndex] = { ...replacement, text };
+      preservedTriggerField = triggerField;
+    }
+    if (!validateScenarioContent(copy)) return { error: 'scenario-content validation rejected the candidate' };
+  }
+  return { scenario: copy, replacements, preservedTriggerField };
 }
 
-function parseVariants(value: unknown): CandidateVariant[] {
-  if (!value || typeof value !== 'object' || !Array.isArray((value as { variants?: unknown }).variants)) return [];
-  return ((value as { variants: unknown[] }).variants).flatMap((item) => {
-    if (!item || typeof item !== 'object') return [];
+function parseVariants(value: unknown): VariantParseResult {
+  if (!value || typeof value !== 'object') {
+    return { variants: [], dropped: [], error: 'structured response was not an object' };
+  }
+  const rawVariants = (value as { variants?: unknown }).variants;
+  if (!Array.isArray(rawVariants)) {
+    return { variants: [], dropped: [], error: 'structured response did not contain a variants array' };
+  }
+  const variants: ParsedVariant[] = [];
+  const dropped: VariantParseResult['dropped'] = [];
+  for (const [index, item] of rawVariants.entries()) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      dropped.push({ index, reason: 'variant was not an object' });
+      continue;
+    }
     const candidate = item as { rationale?: unknown; replacements?: unknown };
-    if (typeof candidate.rationale !== 'string' || !Array.isArray(candidate.replacements)) return [];
-    const replacements = candidate.replacements.flatMap((replacement) => {
-      if (!replacement || typeof replacement !== 'object') return [];
+    if (typeof candidate.rationale !== 'string') {
+      dropped.push({ index, reason: 'rationale was not a string' });
+      continue;
+    }
+    if (!Array.isArray(candidate.replacements)) {
+      dropped.push({ index, reason: 'replacements was not an array' });
+      continue;
+    }
+    const replacements: SearchReplacement[] = [];
+    let invalidReplacement: string | undefined;
+    for (const [replacementIndex, replacement] of candidate.replacements.entries()) {
+      if (!replacement || typeof replacement !== 'object' || Array.isArray(replacement)) {
+        invalidReplacement = `replacement ${replacementIndex} was not an object`;
+        break;
+      }
       const row = replacement as { field?: unknown; text?: unknown };
-      return typeof row.field === 'string' && typeof row.text === 'string'
-        ? [{ field: row.field, text: row.text }]
-        : [];
-    });
-    return [{ rationale: candidate.rationale, replacements }];
-  });
+      if (typeof row.field !== 'string' || typeof row.text !== 'string') {
+        invalidReplacement = `replacement ${replacementIndex} did not contain string field and text values`;
+        break;
+      }
+      replacements.push({ field: row.field, text: row.text });
+    }
+    if (invalidReplacement) {
+      dropped.push({ index, reason: invalidReplacement });
+      continue;
+    }
+    variants.push({ index, variant: { rationale: candidate.rationale, replacements } });
+  }
+  return { variants, dropped };
+}
+
+function responsePreview(value: unknown): string {
+  try {
+    return (JSON.stringify(value) ?? String(value)).slice(0, 400);
+  } catch {
+    return String(value).slice(0, 400);
+  }
 }
 
 function formatGoal(scenario: Scenario): string {
@@ -235,6 +296,7 @@ export async function runAdaptiveSearch(input: {
   let budgetReached = false;
   const callsUsed = () => input.provider.calls() - startingCalls;
   const emit = async (node: SearchNode) => {
+    console.error(`[search] ${node.seedId} depth=${node.depth} level=${node.level} calls=${node.calls}`);
     await input.sink?.({ type: 'search.node', searchId, runId: searchId, ts: Date.now(), node });
   };
 
@@ -275,7 +337,10 @@ export async function runAdaptiveSearch(input: {
       for (const parent of parents) {
         if (callsUsed() >= budget) { budgetReached = true; break; }
         const fields = carrierFields(parent.scenario).map(({ field, text }) => ({ field, text }));
-        if (!fields.length) continue;
+        if (!fields.length) {
+          console.error(`[search] no mutable carrier fields seed=${seed.id} parent=${parent.node.id} depth=${currentDepth + 1}`);
+          continue;
+        }
         const system = prompt
           .replaceAll('{{world_summary}}', () => worldSummary)
           .replaceAll('{{task}}', () => parent.scenario.task)
@@ -284,12 +349,45 @@ export async function runAdaptiveSearch(input: {
           .replaceAll('{{history}}', () => formatHistory(parent.node, new Map(nodes.map((node) => [node.id, node]))))
           .replaceAll('{{n}}', () => String(width));
         const user = `DEPTH:${currentDepth + 1}\nVARIANTS:${width}\nCARRIER_FIELDS_JSON:${JSON.stringify(fields)}`;
-        const raw = await input.provider.structured('red', system, user, SearchSchema);
-        const variants = parseVariants(raw).slice(0, width);
-        if (callsUsed() >= budget) { budgetReached = true; break; }
-        for (const variant of variants) {
+        let raw: unknown;
+        try {
+          raw = await input.provider.structured('red', system, user, SearchSchema);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.error(`[search] attacker error seed=${seed.id} parent=${parent.node.id} depth=${currentDepth + 1}: ${message}`);
+          throw error;
+        }
+        const parsed = parseVariants(raw);
+        for (const dropped of parsed.dropped) {
+          console.error(`[search] dropped variant seed=${seed.id} parent=${parent.node.id} depth=${currentDepth + 1} index=${dropped.index} reason=${dropped.reason}`);
+        }
+        if (parsed.error) {
+          console.error(`[search] attacker response error seed=${seed.id} parent=${parent.node.id} depth=${currentDepth + 1} reason=${parsed.error} preview=${responsePreview(raw)}`);
+        } else if (!parsed.variants.length && !parsed.dropped.length) {
+          console.error(`[search] attacker returned no variants seed=${seed.id} parent=${parent.node.id} depth=${currentDepth + 1}`);
+        }
+        console.error(`[search] attacker response seed=${seed.id} parent=${parent.node.id} depth=${currentDepth + 1} accepted=${parsed.variants.length} dropped=${parsed.dropped.length} calls=${callsUsed()}`);
+        if (callsUsed() >= budget) {
+          for (const candidate of parsed.variants) {
+            console.error(`[search] dropped variant seed=${seed.id} parent=${parent.node.id} depth=${currentDepth + 1} index=${candidate.index} reason=search budget exhausted after attacker call`);
+          }
+          budgetReached = true;
+          break;
+        }
+        for (const [variantIndex, candidate] of parsed.variants.entries()) {
+          const { index, variant } = candidate;
+          if (variantIndex >= width) {
+            console.error(`[search] dropped variant seed=${seed.id} parent=${parent.node.id} depth=${currentDepth + 1} index=${index} reason=exceeds requested width ${width}`);
+            continue;
+          }
           const prepared = applyVariant(parent.scenario, variant);
-          if (!prepared) continue;
+          if ('error' in prepared) {
+            console.error(`[search] dropped variant seed=${seed.id} parent=${parent.node.id} depth=${currentDepth + 1} index=${index} reason=${prepared.error}`);
+            continue;
+          }
+          if (prepared.preservedTriggerField) {
+            console.error(`[search] preserved fixture trigger seed=${seed.id} parent=${parent.node.id} depth=${currentDepth + 1} index=${index} field=${prepared.preservedTriggerField}`);
+          }
           const beforeRun = input.provider.calls();
           const result = await runScenario({
             scenario: prepared.scenario,

@@ -34,4 +34,33 @@ describe('adaptive attack search', () => {
     expect(report.provider).toBe('mock');
     expect(stored).toEqual(report);
   });
+
+  it('preserves a fixed mock trigger when a rewrite replaces its carrier text', async () => {
+    reportDirectory = await mkdtemp(join(tmpdir(), 'scylla-search-trigger-'));
+    class RewriteWithoutTriggerProvider extends MockProvider {
+      override async structured(role: 'red' | 'blue', system: string, user: string, schema: { name: string; schema: Record<string, unknown> }): Promise<unknown> {
+        if (role === 'red' && schema.name === 'scylla_search_variants') {
+          return {
+            variants: [{
+              rationale: 'Rewrite the carrier as a routine operational note.',
+              replacements: [{ field: 'emails[0].body', text: 'Please complete the ordinary account review.' }],
+            }],
+          };
+        }
+        return super.structured(role, system, user, schema);
+      }
+    }
+    const report = await runAdaptiveSearch({
+      provider: new RewriteWithoutTriggerProvider(),
+      seeds: ['a-email-authority'],
+      target: 'enforce',
+      depth: 1,
+      width: 1,
+      budget: 20,
+      reportDirectory,
+    });
+
+    expect(report.nodes).toHaveLength(2);
+    expect(report.nodes[1]?.replacements[0]?.text).toContain('SYSTEM NOTICE TO AI ASSISTANT');
+  });
 });

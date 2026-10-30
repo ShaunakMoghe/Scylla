@@ -44,7 +44,14 @@ export async function inspectIngress(input: IngressInput): Promise<{ decision: I
     if (input.image && enabled(input.layers, 'vision')) {
       start = performance.now();
       const vision = await input.provider.vision({ source: input.source, image: input.image.data, mime: input.image.mime, renderedLines: input.image.lines });
-      timings.push({ layer: 'vision', ms: performance.now() - start, model: input.provider.models.vision });
+      timings.push({
+        layer: 'vision',
+        ms: performance.now() - start,
+        model: input.provider.models.vision,
+        source: input.source,
+        injection: vision.injection,
+        hiddenTextExcerpt: vision.hidden_text.slice(0, 120),
+      });
       if (vision.injection) {
         const quote = vision.instructions_to_ai[0] ?? vision.hidden_text ?? vision.visible_text;
         let boxes;
@@ -67,7 +74,14 @@ export async function inspectIngress(input: IngressInput): Promise<{ decision: I
           return { tile, vision: tileVision, ms: performance.now() - tileStart };
         }));
         for (const result of results) {
-          timings.push({ layer: 'vision', ms: result.ms, model: input.provider.models.vision });
+          timings.push({
+            layer: 'vision',
+            ms: result.ms,
+            model: input.provider.models.vision,
+            source: `${input.source}#tile${result.tile.index}`,
+            injection: result.vision.injection,
+            hiddenTextExcerpt: result.vision.hidden_text.slice(0, 120),
+          });
           if (!result.vision.injection) continue;
           const quote = result.vision.instructions_to_ai[0] ?? result.vision.hidden_text ?? result.vision.visible_text;
           const segmentStart = performance.now();

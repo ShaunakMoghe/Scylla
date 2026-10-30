@@ -232,6 +232,9 @@ export async function runScenario(options: RunScenarioOptions): Promise<RunScena
   const protectedAnswer = protectFinalAnswer(world, finalAnswer, options.mode);
   finalAnswer = protectedAnswer.text;
   await emit({ type: 'agent.final', text: finalAnswer, strippedUrls: protectedAnswer.strippedUrls });
+  const visionDiagnostics = trace.flatMap((event) => event.type === 'scylla.ingress'
+    ? event.decision.timings.filter((timing) => timing.layer === 'vision' && timing.injection !== undefined)
+    : []);
   const resultBase = {
     runId,
     scenarioId: options.scenario.id,
@@ -247,6 +250,7 @@ export async function runScenario(options: RunScenarioOptions): Promise<RunScena
     modelCalls: provider.calls(),
     scyllaMs: trace.reduce((sum, event) => sum + (event.type === 'scylla.ingress' || event.type === 'scylla.egress' ? event.decision.timings.reduce((total, timing) => total + timing.ms, 0) : 0), 0),
     finalAnswer,
+    visionDiagnostics,
   };
   const score = scoreScenario(options.scenario, { trace, finalAnswer }, world, world.outbox);
   const result = { ...resultBase, ...score, trace };
@@ -266,6 +270,7 @@ export async function runScenario(options: RunScenarioOptions): Promise<RunScena
     modelCalls: result.modelCalls,
     scyllaMs: result.scyllaMs,
     finalAnswer: result.finalAnswer,
+    visionDiagnostics: result.visionDiagnostics,
   };
   await emit({ type: 'run.end', result: summary });
   return { ...result, world, ingressInputs };
