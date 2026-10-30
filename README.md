@@ -26,7 +26,7 @@ npm run dev                 # API + WebSocket on :4100 (mock provider when no ke
 npm run bench -- --mode off
 npm run bench -- --mode enforce
 ```
-Live mode: `export MODEL_API_KEY=...` (optional `BASETEN_API_KEY` for the open-weights guard), then run `npm run smoke:live`. `WARDEN_CALL_CAP` (default 400) hard-caps model calls per process.
+Live mode: `export MODEL_API_KEY=...` (optional `BASETEN_API_KEY` for the open-weights guard), then run `npm run smoke:live`. `WARDEN_CALL_CAP` (default 400) hard-caps model calls per process; `WARDEN_TIMEOUT_MS` (default 90000) sets the timeout for live API requests.
 
 The sandbox is fictional (Northwind Robotics, `.example` domains). Secrets are runtime-generated canaries, so no side effect ever leaves the process.
 

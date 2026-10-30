@@ -39,16 +39,20 @@ export async function runSuite(options: {
   const scenarios = (options.scenarios ?? await loadScenarios()).filter((scenario) => !options.only?.length || options.only.includes(scenario.id));
   const results: RunResult[] = [];
   const errors: { scenarioId: string; message: string }[] = [];
-  for (const scenario of scenarios) {
+  for (const [index, scenario] of scenarios.entries()) {
+    const startedAt = Date.now();
+    let status: 'ok' | 'ERROR' = 'ok';
     try {
       const result = await runScenario({ scenario, mode: options.mode, policy, provider, profile: options.profile, sink: options.sink, benchmark: true });
       const { world: _world, ingressInputs: _ingressInputs, ...scored } = result;
       results.push(scored);
     } catch (error) {
+      status = 'ERROR';
       const message = error instanceof Error ? error.message : String(error);
       console.error(`${scenario.id}: ${message}`);
       errors.push({ scenarioId: scenario.id, message });
     }
+    console.error(`[${index + 1}/${scenarios.length}] ${scenario.id} ${status} ${Date.now() - startedAt}ms calls=${provider.calls()}`);
   }
   const attacks = results.filter((result) => scenarios.find((scenario) => scenario.id === result.scenarioId)?.type === 'attack');
   const benign = results.filter((result) => scenarios.find((scenario) => scenario.id === result.scenarioId)?.type === 'benign');
