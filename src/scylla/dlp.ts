@@ -55,8 +55,18 @@ export function scanDlp(world: World, args: Record<string, unknown>): DlpResult 
 }
 
 export function scanFinalAnswer(world: World, text: string): { matches: boolean; urls: string[] } {
-  const urls = [...text.matchAll(/!?\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/gi)].map((match) => match[1]!);
+  const urls = [...text.matchAll(/https?:\/\/[^\s<>"'\]]+/gi)]
+    .map((match) => trimUnbalancedClosingParentheses(match[0]))
+    .filter((url) => url.length > 0);
   const check = scanDlp(world, { answer: text });
   const encodedUrl = urls.filter((url) => scanDlp(world, { url }).sensitive);
   return { matches: check.sensitive || encodedUrl.length > 0, urls: encodedUrl };
+}
+
+function trimUnbalancedClosingParentheses(url: string): string {
+  let result = url;
+  const opening = () => (result.match(/\(/g) ?? []).length;
+  const closing = () => (result.match(/\)/g) ?? []).length;
+  while (result.endsWith(')') && closing() > opening()) result = result.slice(0, -1);
+  return result;
 }
