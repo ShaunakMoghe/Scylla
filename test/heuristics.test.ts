@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { Scenario } from '../src/shared/types.js';
-import { detectHeuristics } from '../src/warden/heuristics.js';
+import { detectHeuristics } from '../src/scylla/heuristics.js';
 import { loadScenarios } from '../src/bench/run.js';
 import { buildWorld } from '../src/world/world.js';
 import { MockProvider } from '../src/model/mock.js';
-import { loadPolicy } from '../src/warden/policy.js';
+import { loadPolicy } from '../src/scylla/policy.js';
 import { runScenario } from '../src/bench/run.js';
 
 const carrierByDetector: [string, string][] = [

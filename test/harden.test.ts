@@ -7,8 +7,8 @@ import { MockProvider } from '../src/model/mock.js';
 
 describe('mock red/blue hardening loop', () => {
   it('is deterministic, verifies regressions, and improves each generated round', async () => {
-    const firstDir = await mkdtemp(resolve(tmpdir(), 'warden-harden-a-'));
-    const secondDir = await mkdtemp(resolve(tmpdir(), 'warden-harden-b-'));
+    const firstDir = await mkdtemp(resolve(tmpdir(), 'scylla-harden-a-'));
+    const secondDir = await mkdtemp(resolve(tmpdir(), 'scylla-harden-b-'));
     try {
       const first = await runHardening({ rounds: 3, perRound: 4, reset: true, stateDir: firstDir, provider: 'mock', modelProvider: new MockProvider() });
       const second = await runHardening({ rounds: 3, perRound: 4, reset: true, stateDir: secondDir, provider: 'mock', modelProvider: new MockProvider() });

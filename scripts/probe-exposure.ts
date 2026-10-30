@@ -1,5 +1,5 @@
 // Corpus validity probe: for each attack, did the agent actually read the attacker-controlled
-// carrier (an email/page/file/voicemail introduced by the scenario patch)? Mode off, no Warden.
+// carrier (an email/page/file/voicemail introduced by the scenario patch)? Mode off, no Scylla.
 import { writeFile, mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { LiveProvider } from '../src/model/live.js';
@@ -7,7 +7,7 @@ import { MockProvider } from '../src/model/mock.js';
 import { loadScenarios, runScenario } from '../src/bench/run.js';
 import { loadPolicyVersion } from '../src/bench/suite.js';
 
-const live = process.env.WARDEN_PROVIDER === 'live';
+const live = process.env.SCYLLA_PROVIDER === 'live';
 const provider = live ? new LiveProvider() : new MockProvider();
 const profile = (process.argv[2] ?? 'standard') as 'standard' | 'compliant';
 const policy = await loadPolicyVersion();

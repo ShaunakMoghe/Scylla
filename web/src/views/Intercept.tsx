@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { WardenEvent, Scenario, WardenMode, RunResult, Finding } from '../../../src/shared/types';
-import { getJSON, postJSON, type useWarden } from '../api';
+import type { ScyllaEvent, Scenario, ScyllaMode, RunResult, Finding } from '../../../src/shared/types';
+import { getJSON, postJSON, type useScylla } from '../api';
 import { LinkGraph, collectCalls, isLeak, type CallInfo } from '../graph';
 import { Panel, Tag, Btn, KV, Glyph, vectorGlyph, toolGlyph, short, unfence, clock, hash, Highlight, type Tone } from '../ui';
 
 type RunEnd = Omit<RunResult, 'trace'>;
-type Props = ReturnType<typeof useWarden>;
+type Props = ReturnType<typeof useScylla>;
 
 export function Intercept({ store, run, waitEnd }: Props) {
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
@@ -18,7 +18,7 @@ export function Intercept({ store, run, waitEnd }: Props) {
   useEffect(() => { getJSON<Scenario[]>('/api/scenarios').then((s) => s && setScenarios(s)); }, [store.policy?.version]);
   const scenario = scenarios.find((s) => s.id === sel);
 
-  const go = async (modes: WardenMode[]) => {
+  const go = async (modes: ScyllaMode[]) => {
     setBusy(true); setPair({}); setFocus(null);
     for (const m of modes) {
       const id = await run(sel, m);
@@ -30,7 +30,7 @@ export function Intercept({ store, run, waitEnd }: Props) {
     setBusy(false);
   };
 
-  const lanes = [pair.off && { id: pair.off, label: 'A · UNPROTECTED' }, pair.on && { id: pair.on, label: 'B · BEHIND WARDEN' }].filter(Boolean) as { id: string; label: string }[];
+  const lanes = [pair.off && { id: pair.off, label: 'A · UNPROTECTED' }, pair.on && { id: pair.on, label: 'B · BEHIND SCYLLA' }].filter(Boolean) as { id: string; label: string }[];
 
   return (
     <div className="flex-1 min-h-0 grid grid-cols-[230px_1fr_310px] 2xl:grid-cols-[260px_1fr_360px] gap-px bg-g-700">
@@ -64,7 +64,7 @@ export function Intercept({ store, run, waitEnd }: Props) {
           <div className="flex-1 grid place-items-center grid-bg">
             <div className="text-center">
               <div className="label mb-2">No active tasking</div>
-              <div className="font-mono text-[11px] text-g-400 max-w-sm">Run COMPARE to execute the same task on the same agent and world, once exposed and once behind Warden.</div>
+              <div className="font-mono text-[11px] text-g-400 max-w-sm">Run COMPARE to execute the same task on the same agent and world, once exposed and once behind Scylla.</div>
             </div>
           </div>
         ) : (
@@ -124,9 +124,9 @@ function outcome(end: RunEnd | undefined, scenario?: Scenario): { text: string; 
   return end.success ? { text: 'compromised', tone: 'hostile' } : { text: 'attack stopped', tone: 'clear' };
 }
 
-function Lane({ label, runId, events, scenario, focus, onFocus, active }: { label: string; runId: string; events: WardenEvent[]; scenario?: Scenario; focus?: string; onFocus: (c?: string) => void; active: boolean }) {
-  const start = events.find((e) => e.type === 'run.start') as Extract<WardenEvent, { type: 'run.start' }> | undefined;
-  const end = (events.find((e) => e.type === 'run.end') as Extract<WardenEvent, { type: 'run.end' }> | undefined)?.result;
+function Lane({ label, runId, events, scenario, focus, onFocus, active }: { label: string; runId: string; events: ScyllaEvent[]; scenario?: Scenario; focus?: string; onFocus: (c?: string) => void; active: boolean }) {
+  const start = events.find((e) => e.type === 'run.start') as Extract<ScyllaEvent, { type: 'run.start' }> | undefined;
+  const end = (events.find((e) => e.type === 'run.end') as Extract<ScyllaEvent, { type: 'run.end' }> | undefined)?.result;
   const o = outcome(end, scenario);
   useEffect(() => { document.getElementById(`feed-end-${runId}`)?.scrollIntoView({ block: 'end' }); }, [events.length, runId]);
   return (
@@ -142,7 +142,7 @@ function Lane({ label, runId, events, scenario, focus, onFocus, active }: { labe
       </div>
       <div className="h-6 shrink-0 flex items-center px-2.5 border-b border-g-700 bg-g-850">
         <span className="label">Activity feed</span>
-        {end && <span className="ml-auto font-mono text-[9.5px] text-g-400">STEPS {end.steps} · CALLS {end.modelCalls} · BLOCKED {end.blockedCalls} · FLAGS {end.ingressFlags} · WARDEN {Math.round(end.wardenMs)}MS</span>}
+        {end && <span className="ml-auto font-mono text-[9.5px] text-g-400">STEPS {end.steps} · CALLS {end.modelCalls} · BLOCKED {end.blockedCalls} · FLAGS {end.ingressFlags} · SCYLLA {Math.round(end.scyllaMs)}MS</span>}
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto font-mono text-[11px]">
         {events.map((e, i) => <FeedRow key={i} e={e} onFocus={onFocus} focus={focus} t0={start?.ts ?? e.ts} />)}
@@ -152,7 +152,7 @@ function Lane({ label, runId, events, scenario, focus, onFocus, active }: { labe
   );
 }
 
-function FeedRow({ e, onFocus, focus, t0 }: { e: WardenEvent; onFocus: (c?: string) => void; focus?: string; t0: number }) {
+function FeedRow({ e, onFocus, focus, t0 }: { e: ScyllaEvent; onFocus: (c?: string) => void; focus?: string; t0: number }) {
   const t = `+${((e.ts - t0) / 1000).toFixed(2)}s`;
   const row = (tone: Tone | 'text', tag: string, body: React.ReactNode, callId?: string) => (
     <div onClick={() => callId && onFocus(callId)}
@@ -167,11 +167,11 @@ function FeedRow({ e, onFocus, focus, t0 }: { e: WardenEvent; onFocus: (c?: stri
     case 'agent.thought': return e.text.trim() ? row('muted', 'REASON', <span className="italic text-g-300">{short(e.text, 260)}</span>) : null;
     case 'agent.tool_call': return row('intel', 'CALL', <>{e.tool}<span className="text-g-400">({short(JSON.stringify(e.args), 110)})</span></>, e.callId);
     case 'tool.result': return row('muted', 'RESULT', <span className="text-g-400">{short(unfence(e.preview), 140)}</span>, e.callId);
-    case 'warden.ingress': {
+    case 'scylla.ingress': {
       const d = e.decision; const tone: Tone = d.verdict === 'quarantine' ? 'hostile' : d.verdict === 'sanitize' || d.findings.length ? 'caution' : 'clear';
       return row(tone, `IN·${d.verdict.toUpperCase().slice(0, 6)}`, <>{d.source}{d.findings.length ? <span className="text-g-400"> — {d.findings.map((f) => f.layer).join(', ')}</span> : null}</>, e.callId);
     }
-    case 'warden.egress': {
+    case 'scylla.egress': {
       const d = e.decision; const tone: Tone = d.verdict === 'block' ? 'hostile' : d.verdict === 'ask_human' ? 'caution' : 'clear';
       return row(tone, `OUT·${d.verdict === 'ask_human' ? 'HOLD' : d.verdict.toUpperCase()}`, <>{d.tool}{d.judge ? <span className="text-g-400"> — {short(d.judge.reason, 120)}</span> : null}</>, e.callId);
     }
@@ -186,12 +186,12 @@ function FeedRow({ e, onFocus, focus, t0 }: { e: WardenEvent; onFocus: (c?: stri
   }
 }
 
-function Inspector({ focus, events, scenario }: { focus: { runId: string; callId?: string } | null; events: WardenEvent[]; scenario?: Scenario }) {
+function Inspector({ focus, events, scenario }: { focus: { runId: string; callId?: string } | null; events: ScyllaEvent[]; scenario?: Scenario }) {
   const calls = useMemo(() => collectCalls(events), [events]);
   const call = calls.find((c) => c.callId === focus?.callId);
-  const start = events.find((e) => e.type === 'run.start') as Extract<WardenEvent, { type: 'run.start' }> | undefined;
-  const end = (events.find((e) => e.type === 'run.end') as Extract<WardenEvent, { type: 'run.end' }> | undefined)?.result;
-  const final = events.find((e) => e.type === 'agent.final') as Extract<WardenEvent, { type: 'agent.final' }> | undefined;
+  const start = events.find((e) => e.type === 'run.start') as Extract<ScyllaEvent, { type: 'run.start' }> | undefined;
+  const end = (events.find((e) => e.type === 'run.end') as Extract<ScyllaEvent, { type: 'run.end' }> | undefined)?.result;
+  const final = events.find((e) => e.type === 'agent.final') as Extract<ScyllaEvent, { type: 'agent.final' }> | undefined;
   return (
     <Panel title="Inspector" right={call ? <Tag tone="friendly">object</Tag> : start ? <Tag>run</Tag> : null} bodyClass="overflow-y-auto">
       {!focus ? <div className="p-4 font-mono text-[11px] text-g-500">Select a node or feed entry to inspect it.</div>
@@ -211,7 +211,7 @@ function Inspector({ focus, events, scenario }: { focus: { runId: string; callId
                 <div className="label mb-1.5">Assessment</div>
                 {(() => { const o = outcome(end, scenario); return o ? <div className="mb-2"><Tag tone={o.tone} solid>{o.text}</Tag></div> : null; })()}
                 <KV k="steps" v={end.steps} /><KV k="model calls" v={end.modelCalls} /><KV k="blocked" v={end.blockedCalls} tone={end.blockedCalls ? 'clear' : undefined} />
-                <KV k="held" v={end.heldCalls} /><KV k="ingress flags" v={end.ingressFlags} /><KV k="warden time" v={`${Math.round(end.wardenMs)} ms`} />
+                <KV k="held" v={end.heldCalls} /><KV k="ingress flags" v={end.ingressFlags} /><KV k="scylla time" v={`${Math.round(end.scyllaMs)} ms`} />
               </div>
             )}
             <div>

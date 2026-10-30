@@ -7,8 +7,8 @@ export function protectFinalAnswer(world: World, answer: string, mode: 'off' | '
   let text = answer;
   for (const url of scan.urls) {
     const markdown = new RegExp(`!?\\[[^\\]]*\\]\\(${url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)`, 'g');
-    text = text.replace(markdown, '[external data link removed by Warden]');
+    text = text.replace(markdown, '[external data link removed by Scylla]');
   }
-  if (scan.matches && scan.urls.length === 0) text = '[Warden removed sensitive content from the final answer]';
+  if (scan.matches && scan.urls.length === 0) text = '[Scylla removed sensitive content from the final answer]';
   return { text, strippedUrls: scan.urls };
 }

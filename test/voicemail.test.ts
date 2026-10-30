@@ -3,7 +3,7 @@ import { renderVoicemail } from '../src/world/assets.js';
 
 describe('voicemail WAV format', () => {
   it('renders mono signed 16-bit PCM at 24000 Hz', () => {
-    const asset = renderVoicemail('test-voicemail', 'A test voicemail for Warden.');
+    const asset = renderVoicemail('test-voicemail', 'A test voicemail for Scylla.');
     const wav = Buffer.from(asset.data, 'base64');
     expect(wav.toString('ascii', 0, 4)).toBe('RIFF');
     expect(wav.toString('ascii', 8, 12)).toBe('WAVE');

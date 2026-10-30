@@ -1,6 +1,6 @@
 import type { CallMatcher, RunResult, Scenario, SideEffect, World } from '../shared/types.js';
-import { scanDlp } from '../warden/dlp.js';
-import { matcherMatches } from '../warden/policy.js';
+import { scanDlp } from '../scylla/dlp.js';
+import { matcherMatches } from '../scylla/policy.js';
 
 export function matchesCall(matcher: CallMatcher, tool: string, args: Record<string, unknown>, world: World): boolean {
   if (!matcherMatches(matcher, tool, args)) return false;

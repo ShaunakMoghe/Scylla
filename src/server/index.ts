@@ -6,7 +6,8 @@ import { readdir, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocket, WebSocketServer } from 'ws';
-import type { BenchReport, Scenario, WardenEvent, WardenMode } from '../shared/types.js';
+import type { BenchReport, Scenario, ScyllaEvent, ScyllaMode } from '../shared/types.js';
+import { normalizeLegacyReport } from '../shared/normalize-report.js';
 import { callCap } from '../model/provider.js';
 import { createProvider } from '../model/index.js';
 import { loadScenarios, runScenario } from '../bench/run.js';
@@ -28,7 +29,7 @@ let busy = false;
 app.use(cors());
 app.use(express.json({ limit: '8mb' }));
 
-const publish = async (event: WardenEvent) => {
+const publish = async (event: ScyllaEvent) => {
   bus.publish(event);
   if (event.type === 'run.end' || event.type === 'bench.report' || event.type === 'policy.updated') {
     const status = await getStatus();
@@ -58,7 +59,7 @@ app.get('/api/reports', async (_req, res) => {
   const runsDir = resolve(root, 'runs');
   try {
     const names = (await readdir(runsDir)).filter((name) => /^bench-.*\.json$/.test(name));
-    const reports = await Promise.all(names.map(async (name) => JSON.parse(await readFile(resolve(runsDir, name), 'utf8')) as BenchReport));
+    const reports = await Promise.all(names.map(async (name) => normalizeLegacyReport(JSON.parse(await readFile(resolve(runsDir, name), 'utf8'))) as BenchReport));
     reports.sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id));
     res.json(reports);
   } catch (error) {
@@ -68,7 +69,8 @@ app.get('/api/reports', async (_req, res) => {
 app.get('/api/report/:id', async (req, res) => {
   try {
     if (!/^bench-[\w-]+$/.test(req.params.id)) return res.status(404).json({ error: 'Report not found' });
-    res.type('application/json').send(await readFile(resolve(root, 'runs', `${req.params.id}.json`), 'utf8'));
+    const report = JSON.parse(await readFile(resolve(root, 'runs', `${req.params.id}.json`), 'utf8'));
+    res.json(normalizeLegacyReport(report));
   } catch {
     res.status(404).json({ error: 'Report not found' });
   }
@@ -81,7 +83,7 @@ app.get('/api/assets/:runId/:assetId', (req, res) => {
 });
 
 app.post('/api/run', async (req, res) => {
-  const { scenarioId, mode = 'enforce', profile = 'standard' } = req.body as { scenarioId?: string; mode?: WardenMode; profile?: 'standard' | 'compliant' };
+  const { scenarioId, mode = 'enforce', profile = 'standard' } = req.body as { scenarioId?: string; mode?: ScyllaMode; profile?: 'standard' | 'compliant' };
   if (busy) return res.status(409).json({ error: 'A run is already in progress' });
   if (!scenarioId || !['off', 'shadow', 'enforce'].includes(mode)) return res.status(400).json({ error: 'scenarioId and a valid mode are required' });
   busy = true;
@@ -135,7 +137,7 @@ app.post('/api/approval/:id', (req, res) => {
 });
 
 app.post('/api/bench', async (req, res) => {
-  const { mode = 'enforce', provider: requestedProvider, profile } = req.body as { mode?: WardenMode; provider?: 'mock' | 'live'; profile?: 'standard' | 'compliant' };
+  const { mode = 'enforce', provider: requestedProvider, profile } = req.body as { mode?: ScyllaMode; provider?: 'mock' | 'live'; profile?: 'standard' | 'compliant' };
   if (busy) return res.status(409).json({ error: 'A run is already in progress' });
   if (!['off', 'shadow', 'enforce'].includes(mode)) return res.status(400).json({ error: 'Invalid mode' });
   if (requestedProvider && !['mock', 'live'].includes(requestedProvider)) return res.status(400).json({ error: 'Invalid provider' });
@@ -198,5 +200,5 @@ ws.on('connection', (socket) => {
 });
 
 server.listen(port, () => {
-  console.log(`Warden server listening on http://localhost:${port}`);
+  console.log(`Scylla server listening on http://localhost:${port}`);
 });

@@ -1,8 +1,8 @@
 import type { LearnedRule, Scenario } from '../shared/types.js';
 import type { JudgeInput, ModelProvider } from '../model/provider.js';
 import type { RunScenarioExecution } from '../bench/run.js';
-import { scanDlp } from '../warden/dlp.js';
-import { matcherMatches, matchingRules } from '../warden/policy.js';
+import { scanDlp } from '../scylla/dlp.js';
+import { matcherMatches, matchingRules } from '../scylla/policy.js';
 
 export interface TraceRecord {
   scenario: Scenario;
@@ -26,8 +26,8 @@ function goalMatches(record: TraceRecord, tool: string, args: Record<string, unk
 }
 
 function baselineBlocked(record: TraceRecord, callId: string): boolean {
-  const event = record.execution.trace.find((item) => item.type === 'warden.egress' && item.callId === callId);
-  return event?.type === 'warden.egress' && event.decision.verdict !== 'allow';
+  const event = record.execution.trace.find((item) => item.type === 'scylla.egress' && item.callId === callId);
+  return event?.type === 'scylla.egress' && event.decision.verdict !== 'allow';
 }
 
 function ingressStops(record: TraceRecord, rule: LearnedRule): boolean {
@@ -38,7 +38,7 @@ function ingressStops(record: TraceRecord, rule: LearnedRule): boolean {
     return goalMatches(record, item.event.tool, item.event.args);
   })?.index ?? Number.POSITIVE_INFINITY;
   return record.execution.trace.some((event, index) => {
-    if (index >= firstGoal || event.type !== 'warden.ingress') return false;
+    if (index >= firstGoal || event.type !== 'scylla.ingress') return false;
     const raw = record.execution.ingressInputs[event.callId]?.text;
     return Boolean(raw && !event.decision.findings.some((finding) => finding.severity === 'high')
       && matchingRules([rule], 'ingress', raw).length);
@@ -63,8 +63,8 @@ async function judgeStops(input: {
   existingClauses: string[];
 }): Promise<boolean> {
   if (input.rule.kind !== 'judge_clause') return false;
-  const baseline = input.record.execution.trace.find((event) => event.type === 'warden.egress' && event.callId === input.callId);
-  if (baseline?.type !== 'warden.egress' || baseline.decision.verdict !== 'allow') return false;
+  const baseline = input.record.execution.trace.find((event) => event.type === 'scylla.egress' && event.callId === input.callId);
+  if (baseline?.type !== 'scylla.egress' || baseline.decision.verdict !== 'allow') return false;
   const dlp = scanDlp(input.record.execution.world, input.args);
   const judgeInput: JudgeInput = {
     task: input.record.scenario.task,
@@ -119,7 +119,7 @@ export async function verifyRule(input: {
   const benignRegressions: string[] = [];
   for (const record of input.records.filter((item) => item.scenario.type === 'benign')) {
     const ingressRegression = input.rule.kind === 'regex' && input.rule.appliesTo === 'ingress' && input.rule.severity === 'high'
-      && record.execution.trace.some((event) => event.type === 'warden.ingress'
+      && record.execution.trace.some((event) => event.type === 'scylla.ingress'
         && Boolean(record.execution.ingressInputs[event.callId]?.text)
         && !event.decision.findings.some((finding) => finding.severity === 'high')
         && matchingRules([input.rule], 'ingress', record.execution.ingressInputs[event.callId]!.text).length > 0);

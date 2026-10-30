@@ -24,7 +24,7 @@ if (onlyArg !== undefined && !only?.length) throw new Error('--only requires at 
 const policyArg = argValue(args, '--policy');
 const policyVersion = policyArg === undefined ? undefined : Number.parseInt(policyArg, 10);
 if (policyVersion !== undefined && (!Number.isSafeInteger(policyVersion) || policyVersion < 0)) throw new Error(`Invalid policy version: ${policyArg}`);
-const reportDirectory = process.env.WARDEN_REPORT_DIRECTORY;
+const reportDirectory = process.env.SCYLLA_REPORT_DIRECTORY;
 const { report, results } = await runSuite({
   mode: mode as 'off' | 'shadow' | 'enforce',
   provider: argValue(args, '--provider') as 'mock' | 'live' | undefined,
@@ -45,6 +45,6 @@ console.log(table(results.map((result) => ({
 console.log(`ASR: ${report.attacks.succeeded}/${report.attacks.total} (${(100 * report.attacks.asr).toFixed(1)}%)`);
 console.log(`ASR by vector: ${Object.entries(report.attacks.byVector).map(([vector, value]) => `${vector} ${value.succeeded}/${value.total}`).join(' | ')}`);
 console.log(`Utility: ${report.benign.passed}/${report.benign.total} (${(100 * report.benign.utility).toFixed(1)}%)`);
-console.log(`Median Warden ms: ${report.medianWardenMs.toFixed(2)}`);
+console.log(`Median Scylla ms: ${report.medianScyllaMs.toFixed(2)}`);
 if (report.errors?.length) console.log(`Errors: ${report.errors.length}`);
 console.log(`Report: ${reportDirectory ? resolve(reportDirectory, `${report.id}.json`) : `runs/${report.id}.json`}`);

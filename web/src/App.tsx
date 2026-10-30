@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useWarden } from './api';
+import { useScylla } from './api';
 import { Glyph, clock } from './ui';
 import { Intercept } from './views/Intercept';
 import { Campaign } from './views/Campaign';
@@ -7,14 +7,14 @@ import { Analytics } from './views/Analytics';
 
 type View = 'intercept' | 'campaign' | 'analytics';
 const NAV: { id: View; glyph: 'intercept' | 'campaign' | 'analytics'; label: string; hint: string }[] = [
-  { id: 'intercept', glyph: 'intercept', label: 'Intercept', hint: 'Live run: unprotected vs Warden' },
+  { id: 'intercept', glyph: 'intercept', label: 'Intercept', hint: 'Live run: unprotected vs Scylla' },
   { id: 'campaign', glyph: 'campaign', label: 'Red / Blue', hint: 'Self-hardening campaign' },
   { id: 'analytics', glyph: 'analytics', label: 'Analytics', hint: 'Benchmark' },
 ];
 
 export default function App() {
-  const warden = useWarden();
-  const { store } = warden;
+  const scylla = useScylla();
+  const { store } = scylla;
   const [view, setView] = useState<View>('intercept');
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
@@ -30,7 +30,7 @@ export default function App() {
         <div className="flex items-center gap-2.5">
           <div className="w-7 h-7 grid place-items-center border border-clear/60 bg-clear/10"><Glyph kind="shield" size={15} color="#35c48a" /></div>
           <div className="leading-none">
-            <div className="font-cond font-semibold tracking-[.28em] text-[13px] text-g-100">WARDEN</div>
+            <div className="font-cond font-semibold tracking-[.28em] text-[13px] text-g-100">SCYLLA</div>
             <div className="font-mono text-[9px] tracking-[.18em] text-g-400 mt-1">AGENT FIREWALL CONSOLE</div>
           </div>
         </div>
@@ -61,7 +61,7 @@ export default function App() {
           ))}
         </nav>
         <main className="flex-1 min-w-0 min-h-0 flex flex-col">
-          {view === 'intercept' && <Intercept {...warden} />}
+          {view === 'intercept' && <Intercept {...scylla} />}
           {view === 'campaign' && <Campaign store={store} />}
           {view === 'analytics' && <Analytics reports={store.reports} />}
         </main>

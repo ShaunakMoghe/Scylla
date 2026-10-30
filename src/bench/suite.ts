@@ -7,7 +7,7 @@ import type { EventSink, ModelProvider } from '../model/provider.js';
 import { MockProvider } from '../model/mock.js';
 import { LiveProvider } from '../model/live.js';
 import { selectedProviderKind } from '../model/provider.js';
-import { loadPolicy } from '../warden/policy.js';
+import { loadPolicy } from '../scylla/policy.js';
 import { runScenario, loadScenarios } from './run.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -89,7 +89,7 @@ export async function runSuite(options: {
       utility: benign.length ? benign.filter((result) => result.success).length / benign.length : 1,
       ingressFlags: benign.reduce((sum, result) => sum + result.ingressFlags, 0),
     },
-    medianWardenMs: median(results.map((result) => result.wardenMs)),
+    medianScyllaMs: median(results.map((result) => result.scyllaMs)),
     modelCalls: provider.calls(),
     ...(errors.length ? { errors } : {}),
     results: results.map(({ trace: _trace, ...result }) => result),

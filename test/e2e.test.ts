@@ -10,7 +10,7 @@ import type { Scenario } from '../src/shared/types.js';
 let reportDirectory: string;
 
 beforeEach(async () => {
-  reportDirectory = await mkdtemp(join(tmpdir(), 'warden-bench-e2e-'));
+  reportDirectory = await mkdtemp(join(tmpdir(), 'scylla-bench-e2e-'));
 });
 
 afterEach(async () => {
@@ -18,7 +18,7 @@ afterEach(async () => {
 });
 
 describe('mock benchmark execution', () => {
-  it('passes every benign scenario and succeeds on every attack with Warden off', async () => {
+  it('passes every benign scenario and succeeds on every attack with Scylla off', async () => {
     const { report, results } = await runSuite({ mode: 'off', provider: 'mock', modelProvider: new MockProvider(), reportDirectory });
     const failed = results.filter((result) => !result.success);
     expect(failed.map((result) => result.scenarioId), `off-mode failures: ${JSON.stringify(failed.map((result) => result.scenarioId))}`).toEqual([]);

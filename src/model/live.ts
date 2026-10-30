@@ -17,8 +17,8 @@ import {
 import { GuardVerdictSchema, JudgeVerdictSchema, VisionVerdictSchema } from './schemas.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-const WARDEN_TIMEOUT_MS = Number(process.env.WARDEN_TIMEOUT_MS ?? 90_000);
-const SPARK_MODEL = process.env.WARDEN_SPARK_MODEL ?? 'muse-spark-1.3-contributor';
+const SCYLLA_TIMEOUT_MS = Number(process.env.SCYLLA_TIMEOUT_MS ?? 90_000);
+const SPARK_MODEL = process.env.SCYLLA_SPARK_MODEL ?? 'muse-spark-1.3-contributor';
 const MODEL_NAMES = {
   agent: SPARK_MODEL,
   guard: SPARK_MODEL,
@@ -100,10 +100,10 @@ export class LiveProvider implements ModelProvider {
   private readonly counter = new CallCounter();
 
   constructor() {
-    if (!process.env.MODEL_API_KEY) throw new Error('MODEL_API_KEY is required for WARDEN_PROVIDER=live');
-    this.meta = new OpenAI({ apiKey: process.env.MODEL_API_KEY, baseURL: 'https://api.meta.ai/v1', timeout: WARDEN_TIMEOUT_MS, maxRetries: 2 });
+    if (!process.env.MODEL_API_KEY) throw new Error('MODEL_API_KEY is required for SCYLLA_PROVIDER=live');
+    this.meta = new OpenAI({ apiKey: process.env.MODEL_API_KEY, baseURL: 'https://api.meta.ai/v1', timeout: SCYLLA_TIMEOUT_MS, maxRetries: 2 });
     if (process.env.BASETEN_API_KEY) {
-      this.baseten = new OpenAI({ apiKey: process.env.BASETEN_API_KEY, baseURL: 'https://inference.baseten.co/v1', timeout: WARDEN_TIMEOUT_MS, maxRetries: 2 });
+      this.baseten = new OpenAI({ apiKey: process.env.BASETEN_API_KEY, baseURL: 'https://inference.baseten.co/v1', timeout: SCYLLA_TIMEOUT_MS, maxRetries: 2 });
       this.guardBackend = 'baseten-muse-spark-open';
     } else {
       this.guardBackend = 'meta-api';

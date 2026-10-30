@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { HardeningRound, PolicyVersion, Scenario, WardenEvent } from '../shared/types.js';
+import type { HardeningRound, PolicyVersion, Scenario, ScyllaEvent } from '../shared/types.js';
 import { MockProvider } from '../model/mock.js';
 import { LiveProvider } from '../model/live.js';
 import { selectedProviderKind, type EventSink, type ModelProvider } from '../model/provider.js';
@@ -13,8 +13,8 @@ import { proposeBlueRule } from './blue.js';
 import { policyClauses, verifyRule, type TraceRecord } from './verify.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-type EventInput = WardenEvent extends infer Event
-  ? Event extends WardenEvent
+type EventInput = ScyllaEvent extends infer Event
+  ? Event extends ScyllaEvent
     ? Omit<Event, 'runId' | 'ts'>
     : never
   : never;
@@ -54,7 +54,7 @@ async function resetState(policyDir: string, generatedDir: string): Promise<void
 }
 
 function caughtBy(execution: RunScenarioExecution): string {
-  const findings = execution.trace.flatMap((event) => event.type === 'warden.ingress' || event.type === 'warden.egress' ? event.decision.findings : []);
+  const findings = execution.trace.flatMap((event) => event.type === 'scylla.ingress' || event.type === 'scylla.egress' ? event.decision.findings : []);
   const dlp = findings.find((finding) => finding.layer === 'dlp');
   if (dlp) return 'dlp';
   const learned = findings.find((finding) => finding.layer === 'learned');
@@ -81,7 +81,7 @@ export async function runHardening(options: RunHardeningOptions = {}): Promise<H
   const runId = options.runId ?? randomUUID();
   const provider = options.modelProvider ?? ((options.provider ?? selectedProviderKind()) === 'live' ? new LiveProvider() : new MockProvider());
   const logs: HardeningResult['logs'] = [];
-  const emit = async (event: EventInput) => options.sink?.({ ...event, runId, ts: Date.now() } as WardenEvent);
+  const emit = async (event: EventInput) => options.sink?.({ ...event, runId, ts: Date.now() } as ScyllaEvent);
   const log = async (phase: HardeningResult['logs'][number]['phase'], text: string) => {
     logs.push({ phase, text });
     await emit({ type: 'harden.log', phase, text });

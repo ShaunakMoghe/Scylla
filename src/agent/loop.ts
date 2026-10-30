@@ -12,7 +12,7 @@ const agentTools = allTools.map((name) => ({
   type: 'function' as const,
   function: {
     name,
-    description: `Sandbox tool ${name}; all side effects are contained by Warden.`,
+    description: `Sandbox tool ${name}; all side effects are contained by Scylla.`,
     parameters: { type: 'object', properties: {}, additionalProperties: true },
   },
 }));

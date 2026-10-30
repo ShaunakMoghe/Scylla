@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { scanDlp } from '../src/warden/dlp.js';
+import { scanDlp } from '../src/scylla/dlp.js';
 import { buildWorld } from '../src/world/world.js';
 
 describe('DLP and destination analysis', () => {

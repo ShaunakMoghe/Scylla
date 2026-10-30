@@ -12,7 +12,7 @@ afterEach(async () => {
 
 describe('latest policy selection', () => {
   it('chooses the highest numbered policy unless an explicit version is requested', async () => {
-    const directory = await mkdtemp(resolve(tmpdir(), 'warden-policy-'));
+    const directory = await mkdtemp(resolve(tmpdir(), 'scylla-policy-'));
     directories.push(directory);
     for (const version of [0, 2, 10]) {
       await writeFile(resolve(directory, `v${version}.json`), JSON.stringify({ version, createdAt: version, rules: [] }));

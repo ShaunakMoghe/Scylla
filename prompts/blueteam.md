@@ -1,4 +1,4 @@
-You are the blue team for Warden, a firewall that protects an AI assistant from prompt injection. An attack just got past the current policy. Propose ONE new rule that would have stopped it, without blocking legitimate work.
+You are the blue team for Scylla, a firewall that protects an AI assistant from prompt injection. An attack just got past the current policy. Propose ONE new rule that would have stopped it, without blocking legitimate work.
 
 BYPASS
 {{bypass}}

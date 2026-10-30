@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { WardenEvent, ServerStatus, Scenario, PolicyVersion, BenchReport, HardeningRound, WardenMode } from '../../src/shared/types';
+import type { ScyllaEvent, ServerStatus, Scenario, PolicyVersion, BenchReport, HardeningRound, ScyllaMode } from '../../src/shared/types';
 
 export async function getJSON<T>(path: string): Promise<T | null> {
   try { const r = await fetch(path); return r.ok ? ((await r.json()) as T) : null; } catch { return null; }
@@ -14,7 +14,7 @@ export async function postJSON<T>(path: string, body: unknown): Promise<T | null
 export interface Store {
   connected: boolean;
   status: ServerStatus | null;
-  runs: Record<string, WardenEvent[]>;
+  runs: Record<string, ScyllaEvent[]>;
   runOrder: string[];
   reports: BenchReport[];
   rounds: HardeningRound[];
@@ -24,9 +24,9 @@ export interface Store {
 
 const empty: Store = { connected: false, status: null, runs: {}, runOrder: [], reports: [], rounds: [], hardenLog: [], policy: null };
 
-export function useWarden() {
+export function useScylla() {
   const [store, setStore] = useState<Store>(empty);
-  const waiters = useRef(new Map<string, (e: WardenEvent) => void>());
+  const waiters = useRef(new Map<string, (e: ScyllaEvent) => void>());
   const ended = useRef(new Set<string>());
 
   useEffect(() => {
@@ -38,7 +38,7 @@ export function useWarden() {
       ws.onopen = () => { ended.current.clear(); setStore((s) => ({ ...s, connected: true, runs: {}, runOrder: [], rounds: [], hardenLog: [] })); };
       ws.onclose = () => { setStore((s) => ({ ...s, connected: false })); if (!closed) setTimeout(connect, 1500); };
       ws.onmessage = (m) => {
-        let e: WardenEvent;
+        let e: ScyllaEvent;
         try { e = JSON.parse(m.data); } catch { return; }
         if (e.type === 'run.end') { ended.current.add(e.runId); waiters.current.get(e.runId)?.(e); }
         setStore((s) => reduce(s, e));
@@ -51,7 +51,7 @@ export function useWarden() {
     return () => { closed = true; ws?.close(); };
   }, []);
 
-  const run = async (scenarioId: string, mode: WardenMode): Promise<string | null> => {
+  const run = async (scenarioId: string, mode: ScyllaMode): Promise<string | null> => {
     const r = await postJSON<{ runId: string }>('/api/run', { scenarioId, mode });
     return r?.runId ?? null;
   };
@@ -62,7 +62,7 @@ export function useWarden() {
   return { store, run, waitEnd };
 }
 
-function reduce(s: Store, e: WardenEvent): Store {
+function reduce(s: Store, e: ScyllaEvent): Store {
   switch (e.type) {
     case 'status': return { ...s, status: e.status };
     case 'policy.updated': return { ...s, policy: e.policy };

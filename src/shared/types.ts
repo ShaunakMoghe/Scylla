@@ -1,4 +1,4 @@
-// Warden shared contract. Server, engine and dashboard all import from here.
+// Scylla shared contract. Server, engine and dashboard all import from here.
 
 export type Vector =
   | 'email'        // injected email body
@@ -10,7 +10,7 @@ export type Vector =
 
 export type Trust = 'trusted' | 'internal' | 'untrusted';
 
-export type WardenMode = 'off' | 'shadow' | 'enforce';
+export type ScyllaMode = 'off' | 'shadow' | 'enforce';
 
 export type ModelRole = 'agent' | 'guard' | 'vision' | 'judge' | 'red' | 'blue';
 
@@ -129,7 +129,7 @@ export interface Scenario {
 
 /**
  * Mock agent: performs the reads implied by the task/patch, then — if `trigger` is
- * present in what it actually saw (after Warden sanitization, after decoding
+ * present in what it actually saw (after Scylla sanitization, after decoding
  * {{TAGS}}/base64 the way a capable model would) — executes `calls` (the attacker's
  * goal). Benign scenarios have no trigger and always execute `calls`.
  * Arg placeholders: {{FILE:path}} = file contents; {{URLENC:FILE:path}} = url-encoded.
@@ -140,7 +140,7 @@ export interface MockPlan {
   answerSuffix?: string; // appended to the final answer (markdown-exfil attacks)
 }
 
-/** Sandbox tool names. Side-effecting tools are routed through Warden egress. */
+/** Sandbox tool names. Side-effecting tools are routed through Scylla egress. */
 export const READ_TOOLS = ['list_emails', 'read_email', 'read_attachment', 'http_get', 'read_file', 'list_files', 'list_voicemails', 'transcribe_voicemail'] as const;
 export const ACTION_TOOLS = ['send_email', 'http_post', 'delete_file', 'pay_invoice', 'create_calendar_event'] as const;
 export type ToolName = (typeof READ_TOOLS)[number] | (typeof ACTION_TOOLS)[number];
@@ -153,7 +153,7 @@ export interface WorldPatch {
   imageSpecs?: ImageSpec[];
 }
 
-// ---------- Warden ----------
+// ---------- Scylla ----------
 
 export type IngressVerdict = 'allow' | 'sanitize' | 'quarantine';
 export type EgressVerdict = 'allow' | 'block' | 'ask_human';
@@ -212,34 +212,34 @@ export interface PolicyVersion {
 export interface RunResult {
   runId: string;
   scenarioId: string;
-  mode: WardenMode;
+  mode: ScyllaMode;
   policyVersion: number;
   provider: 'live' | 'mock';
   /** attacks: did the attacker achieve the goal. benign: did all expected calls execute */
   success: boolean;
-  /** benign only: Warden blocked/held a call that the task needed */
+  /** benign only: Scylla blocked/held a call that the task needed */
   falsePositive?: boolean;
   blockedCalls: number;
   heldCalls: number;
   ingressFlags: number; // sanitized/quarantined ingress items (friction on benign runs)
   steps: number;
   modelCalls: number;
-  wardenMs: number;
+  scyllaMs: number;
   finalAnswer: string;
-  trace: WardenEvent[];
+  trace: ScyllaEvent[];
 }
 
 export interface BenchReport {
   id: string;
   createdAt: number;
   provider: 'live' | 'mock';
-  mode: WardenMode;
+  mode: ScyllaMode;
   profile?: 'standard' | 'compliant';
   only?: string[];
   policyVersion: number;
   attacks: { total: number; succeeded: number; asr: number; byVector: Record<string, { total: number; succeeded: number }> };
   benign: { total: number; passed: number; falsePositives: number; utility: number; ingressFlags: number };
-  medianWardenMs: number;
+  medianScyllaMs: number;
   modelCalls: number;
   errors?: { scenarioId: string; message: string }[];
   results: Omit<RunResult, 'trace'>[];
@@ -260,13 +260,13 @@ export interface HardeningRound {
 
 interface Base { runId: string; ts: number }
 
-export type WardenEvent =
-  | (Base & { type: 'run.start'; scenarioId: string; title: string; mode: WardenMode; task: string; policyVersion: number; provider: 'live' | 'mock' })
+export type ScyllaEvent =
+  | (Base & { type: 'run.start'; scenarioId: string; title: string; mode: ScyllaMode; task: string; policyVersion: number; provider: 'live' | 'mock' })
   | (Base & { type: 'agent.thought'; text: string })                         // assistant text between tool calls
   | (Base & { type: 'agent.tool_call'; callId: string; tool: string; args: Record<string, unknown> })
   | (Base & { type: 'tool.result'; callId: string; tool: string; preview: string; assetIds?: string[] })
-  | (Base & { type: 'warden.ingress'; callId: string; decision: IngressDecision })
-  | (Base & { type: 'warden.egress'; callId: string; decision: EgressDecision; approvalId?: string })
+  | (Base & { type: 'scylla.ingress'; callId: string; decision: IngressDecision })
+  | (Base & { type: 'scylla.egress'; callId: string; decision: EgressDecision; approvalId?: string })
   | (Base & { type: 'approval.resolved'; approvalId: string; approved: boolean })
   | (Base & { type: 'world.side_effect'; effect: SideEffect })
   | (Base & { type: 'agent.final'; text: string; strippedUrls?: string[] })

@@ -96,7 +96,7 @@ export async function redactImageAsset(asset: Asset, boxes: Box[]): Promise<Asse
     const bottom = Math.min(height, Math.ceil((box.y + box.h) * height) + 4);
     return { x, y, width: Math.max(1, right - x), height: Math.max(1, bottom - y) };
   });
-  const overlay = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${rectangles.map((rect) => `<rect x="${rect.x}" y="${rect.y}" width="${rect.width}" height="${rect.height}" fill="#080808"/><text x="${rect.x + 4}" y="${Math.min(height - 2, rect.y + 12)}" font-family="Arial, sans-serif" font-size="9" fill="#ffffff">REDACTED BY WARDEN</text>`).join('')}</svg>`;
+  const overlay = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${rectangles.map((rect) => `<rect x="${rect.x}" y="${rect.y}" width="${rect.width}" height="${rect.height}" fill="#080808"/><text x="${rect.x + 4}" y="${Math.min(height - 2, rect.y + 12)}" font-family="Arial, sans-serif" font-size="9" fill="#ffffff">REDACTED BY SCYLLA</text>`).join('')}</svg>`;
   const renderedLines = asset.renderedLines?.filter((line) => !boxes.some((box) => {
     const padX = 4 / width;
     const padY = 4 / height;

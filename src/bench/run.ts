@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Finding, PolicyVersion, RunResult, Scenario, ToolName, WardenEvent, World } from '../shared/types.js';
+import type { Finding, PolicyVersion, RunResult, Scenario, ToolName, ScyllaEvent, World } from '../shared/types.js';
 import type { EventSink, ModelProvider, RenderedLine, WorldToolResult } from '../model/provider.js';
 import { selectedProviderKind } from '../model/provider.js';
 import { MockProvider } from '../model/mock.js';
@@ -12,14 +12,14 @@ import { runMockAgent } from '../agent/mockAgent.js';
 import { buildWorld, ensureNoTemplates } from '../world/world.js';
 import { redactImageAsset } from '../world/assets.js';
 import { executeRead, isActionTool, recordSideEffect } from '../world/tools.js';
-import { inspectIngress } from '../warden/ingress.js';
-import { inspectEgress } from '../warden/egress.js';
-import { protectFinalAnswer } from '../warden/final.js';
+import { inspectIngress } from '../scylla/ingress.js';
+import { inspectEgress } from '../scylla/egress.js';
+import { protectFinalAnswer } from '../scylla/final.js';
 import { scoreScenario } from './score.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-type EventInput = WardenEvent extends infer Event
-  ? Event extends WardenEvent
+type EventInput = ScyllaEvent extends infer Event
+  ? Event extends ScyllaEvent
     ? Omit<Event, 'runId' | 'ts'>
     : never
   : never;
@@ -79,10 +79,10 @@ export async function runScenario(options: RunScenarioOptions): Promise<RunScena
   const world = await buildWorld(options.scenario, runId);
   options.onWorld?.(runId, world);
   ensureNoTemplates(world);
-  const trace: WardenEvent[] = [];
+  const trace: ScyllaEvent[] = [];
   const ingressInputs: Record<string, { source: string; text: string }> = {};
   const emit = async (event: EventInput) => {
-    const full = { ...event, runId, ts: Date.now() } as WardenEvent;
+    const full = { ...event, runId, ts: Date.now() } as ScyllaEvent;
     trace.push(full);
     await options.sink?.(full);
   };
@@ -125,7 +125,7 @@ export async function runScenario(options: RunScenarioOptions): Promise<RunScena
       });
       if (inspection.decision.verdict !== 'allow') ingressFlags += 1;
       provenance.push({ source, trust: inspection.decision.trust, findings: inspection.decision.findings });
-      await emit({ type: 'warden.ingress', callId, decision: inspection.decision });
+      await emit({ type: 'scylla.ingress', callId, decision: inspection.decision });
       let assetIds = result.assetIds;
       let attachment = result.attachment;
       const boxes = options.mode === 'enforce'
@@ -171,7 +171,7 @@ export async function runScenario(options: RunScenarioOptions): Promise<RunScena
     let execute = options.mode === 'off' || options.mode === 'shadow' || decision.verdict === 'allow';
     if (decision.verdict === 'ask_human') {
       approvalId = randomUUID();
-      await emit({ type: 'warden.egress', callId, decision, approvalId });
+      await emit({ type: 'scylla.egress', callId, decision, approvalId });
       const approved = options.approve
         ? await options.approve({ approvalId, callId, tool: toolName, args })
         : false;
@@ -179,12 +179,12 @@ export async function runScenario(options: RunScenarioOptions): Promise<RunScena
       if (approved) execute = true;
       else { execute = false; heldCalls += 1; blockedCalls += 1; }
     } else {
-      await emit({ type: 'warden.egress', callId, decision });
+      await emit({ type: 'scylla.egress', callId, decision });
       if (decision.verdict === 'block' && options.mode === 'enforce') { execute = false; blockedCalls += 1; }
     }
     const effect = recordSideEffect(world, toolName, args, !execute);
     await emit({ type: 'world.side_effect', effect });
-    const result = { value: execute ? { ok: true, recorded: true } : { error: decision.verdict === 'ask_human' ? 'Approval denied or timed out' : 'Blocked by Warden' } };
+    const result = { value: execute ? { ok: true, recorded: true } : { error: decision.verdict === 'ask_human' ? 'Approval denied or timed out' : 'Blocked by Scylla' } };
     await emit({ type: 'tool.result', callId, tool: toolName, preview: stringify(result.value) });
     return result;
   };
@@ -224,7 +224,7 @@ export async function runScenario(options: RunScenarioOptions): Promise<RunScena
     ingressFlags,
     steps: agentSteps,
     modelCalls: provider.calls(),
-    wardenMs: trace.reduce((sum, event) => sum + (event.type === 'warden.ingress' || event.type === 'warden.egress' ? event.decision.timings.reduce((total, timing) => total + timing.ms, 0) : 0), 0),
+    scyllaMs: trace.reduce((sum, event) => sum + (event.type === 'scylla.ingress' || event.type === 'scylla.egress' ? event.decision.timings.reduce((total, timing) => total + timing.ms, 0) : 0), 0),
     finalAnswer,
   };
   const score = scoreScenario(options.scenario, { trace, finalAnswer }, world, world.outbox);
@@ -242,7 +242,7 @@ export async function runScenario(options: RunScenarioOptions): Promise<RunScena
     ingressFlags: result.ingressFlags,
     steps: result.steps,
     modelCalls: result.modelCalls,
-    wardenMs: result.wardenMs,
+    scyllaMs: result.scyllaMs,
     finalAnswer: result.finalAnswer,
   };
   await emit({ type: 'run.end', result: summary });

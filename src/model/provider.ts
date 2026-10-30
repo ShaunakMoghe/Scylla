@@ -3,7 +3,7 @@ import type {
   Finding,
   ModelRole,
   ToolName,
-  WardenEvent,
+  ScyllaEvent,
   World,
 } from '../shared/types.js';
 
@@ -95,13 +95,13 @@ export interface ModelProvider {
 }
 
 export function selectedProviderKind(): 'mock' | 'live' {
-  const requested = process.env.WARDEN_PROVIDER;
+  const requested = process.env.SCYLLA_PROVIDER;
   if (requested === 'mock' || requested === 'live') return requested;
   return process.env.MODEL_API_KEY ? 'live' : 'mock';
 }
 
 export function callCap(): number {
-  const cap = Number.parseInt(process.env.WARDEN_CALL_CAP ?? '400', 10);
+  const cap = Number.parseInt(process.env.SCYLLA_CALL_CAP ?? '400', 10);
   return Number.isFinite(cap) && cap > 0 ? cap : 400;
 }
 
@@ -113,13 +113,13 @@ export class CallCounter {
   }
   spend(label: string): void {
     if (this.count >= this.cap) {
-      throw new Error(`WARDEN_CALL_CAP=${this.cap} reached before ${label}; refusing additional model call`);
+      throw new Error(`SCYLLA_CALL_CAP=${this.cap} reached before ${label}; refusing additional model call`);
     }
     this.count += 1;
   }
 }
 
-export type EventSink = (event: WardenEvent) => void | Promise<void>;
+export type EventSink = (event: ScyllaEvent) => void | Promise<void>;
 
 export interface WorldToolResult {
   value: unknown;

@@ -1,5 +1,5 @@
 // Live probe: let the Muse Spark red team generate fresh attacks, then run each against the
-// UNPROTECTED agent (mode off) and behind Warden (enforce). Writes runs/probe/red-<ts>.json.
+// UNPROTECTED agent (mode off) and behind Scylla (enforce). Writes runs/probe/red-<ts>.json.
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { LiveProvider } from '../src/model/live.js';

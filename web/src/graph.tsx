@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { WardenEvent, IngressDecision, EgressDecision, SideEffect, WardenMode } from '../../src/shared/types';
+import type { ScyllaEvent, IngressDecision, EgressDecision, SideEffect, ScyllaMode } from '../../src/shared/types';
 import { Glyph, toolGlyph, toneHex, short, type Tone } from './ui';
 
 const READS = new Set(['list_emails', 'read_email', 'read_attachment', 'http_get', 'read_file', 'list_files', 'list_voicemails', 'transcribe_voicemail']);
@@ -19,7 +19,7 @@ export interface CallInfo {
   ts: number;
 }
 
-export function collectCalls(events: WardenEvent[]): CallInfo[] {
+export function collectCalls(events: ScyllaEvent[]): CallInfo[] {
   const calls = new Map<string, CallInfo>();
   let lastAction: CallInfo | undefined;
   for (const e of events) {
@@ -30,10 +30,10 @@ export function collectCalls(events: WardenEvent[]): CallInfo[] {
     } else if (e.type === 'tool.result') {
       const c = calls.get(e.callId);
       if (c) { c.preview = e.preview; c.assetIds = e.assetIds; }
-    } else if (e.type === 'warden.ingress') {
+    } else if (e.type === 'scylla.ingress') {
       const c = calls.get(e.callId);
       if (c) c.ingress = e.decision;
-    } else if (e.type === 'warden.egress') {
+    } else if (e.type === 'scylla.egress') {
       const c = calls.get(e.callId);
       if (c) { c.egress = e.decision; c.approvalId = e.approvalId; }
     } else if (e.type === 'world.side_effect') {
@@ -46,7 +46,7 @@ export function collectCalls(events: WardenEvent[]): CallInfo[] {
 
 export const isLeak = (c: CallInfo) => !!c.effect && !c.effect.blocked && (c.effect.external || CANARY.test(JSON.stringify(c.effect.args)));
 
-export function readTone(c: CallInfo, mode?: WardenMode): Tone {
+export function readTone(c: CallInfo, mode?: ScyllaMode): Tone {
   if (!c.ingress || mode === 'off') return 'muted';
   if (c.ingress.verdict === 'quarantine') return 'hostile';
   if (c.ingress.verdict === 'sanitize') return 'caution';
@@ -75,7 +75,7 @@ function srcLabel(c: CallInfo): string {
 const W = 612, NW = 140, NH = 38, AW = 110;
 const X = { src: 6, inWall: 176, agent: 234, outWall: 372, act: 394, dest: 516 };
 
-export function LinkGraph({ events, mode, selected, onSelect }: { events: WardenEvent[]; mode?: WardenMode; selected?: string; onSelect: (callId?: string) => void }) {
+export function LinkGraph({ events, mode, selected, onSelect }: { events: ScyllaEvent[]; mode?: ScyllaMode; selected?: string; onSelect: (callId?: string) => void }) {
   const calls = useMemo(() => collectCalls(events), [events]);
   const reads = calls.filter((c) => c.kind === 'read' && c.tool !== 'list_emails' && c.tool !== 'list_files' && c.tool !== 'list_voicemails');
   const acts = calls.filter((c) => c.kind === 'action');
