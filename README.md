@@ -11,7 +11,7 @@ Built for the Meta AI Developer Hackathon (Indie track). All code in this repo w
 ## Meta models used
 | Model | Role |
 |---|---|
-| Muse Spark (`muse-spark-1.3`) | protected agent, egress judge, red team, blue team |
+| Muse Spark (`muse-spark-1.3-contributor`) | protected agent, egress judge, red team, blue team |
 | Muse Spark vision | finds instructions hidden in images |
 | SAM 3.1 | localizes the injected region |
 | Muse Voice Transcribe | voicemail ingress |

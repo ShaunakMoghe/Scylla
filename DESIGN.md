@@ -66,14 +66,14 @@ runs/                      run traces + bench reports (gitignored except the dem
 
 | Role | Model | Why |
 |---|---|---|
-| agent | `muse-spark-1.3` (Meta Model API, Responses API, tool calling) | the agent under protection |
-| guard | `meta-models/muse-spark-open-1026` on Baseten, fallback `muse-spark-1.3` | open-weight, runs hot on every ingress; targets the open-weights bonus prize |
-| vision | `muse-spark-1.3` image understanding | reads faint/micro-text in images |
+| agent | `muse-spark-1.3-contributor` (Meta Model API, Responses API, tool calling) | the agent under protection |
+| guard | `meta-models/muse-spark-open-1026` on Baseten, fallback `muse-spark-1.3-contributor` | open-weight, runs hot on every ingress; targets the open-weights bonus prize |
+| vision | `muse-spark-1.3-contributor` image understanding | reads faint/micro-text in images |
 | segment | `sam-3.1` media segmentation | returns the pixel box of the malicious text, drawn on the dashboard |
 | transcribe | `muse-voice-transcribe-1.0` | voicemail vector |
 | image gen | `muse-image-1.0` | red team renders injected invoices/labels |
-| judge | `muse-spark-1.3`, reasoning effort high | alignment check on egress |
-| red / blue | `muse-spark-1.3`, structured output | the hardening loop |
+| judge | `muse-spark-1.3-contributor`, reasoning effort high | alignment check on egress |
+| red / blue | `muse-spark-1.3-contributor`, structured output | the hardening loop |
 
 Everything is reached through one `ModelProvider` interface. `WARDEN_PROVIDER=mock` (default when
 `MODEL_API_KEY` is unset) runs the whole system deterministically with no network and no spend:

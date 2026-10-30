@@ -17,14 +17,15 @@ import {
 import { GuardVerdictSchema, JudgeVerdictSchema, VisionVerdictSchema } from './schemas.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const SPARK_MODEL = process.env.WARDEN_SPARK_MODEL ?? 'muse-spark-1.3-contributor';
 const MODEL_NAMES = {
-  agent: 'muse-spark-1.3',
-  guard: 'muse-spark-1.3',
-  vision: 'muse-spark-1.3',
-  judge: 'muse-spark-1.3',
-  red: 'muse-spark-1.3',
-  blue: 'muse-spark-1.3',
-} as const;
+  agent: SPARK_MODEL,
+  guard: SPARK_MODEL,
+  vision: SPARK_MODEL,
+  judge: SPARK_MODEL,
+  red: SPARK_MODEL,
+  blue: SPARK_MODEL,
+};
 
 function schemaFormat(name: string, schema: Record<string, unknown>) {
   return { type: 'json_schema' as const, json_schema: { name, schema, strict: true } };
