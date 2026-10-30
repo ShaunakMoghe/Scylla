@@ -89,17 +89,17 @@ export function LinkGraph({ events, mode, selected, onSelect }: { events: Scylla
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="block w-full h-auto max-h-full" preserveAspectRatio="xMidYMin meet" onClick={() => onSelect(undefined)}>
       <defs>
-        <pattern id="dots" width="16" height="16" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.8" fill="#26303d" /></pattern>
+
       </defs>
-      <rect width={W} height={H} fill="url(#dots)" />
+
       {['SOURCES', 'AGENT', 'ACTIONS', 'DESTINATION'].map((t, i) => (
-        <text key={t} x={[X.src, X.agent - 20, X.act, X.dest][i]} y={18} className="label" fill="#56626f" style={{ fontSize: 9 }}>{t}</text>
+        <text key={t} x={[X.src, X.agent - 20, X.act, X.dest][i]} y={18} className="label" fill="#5c5c5c" style={{ fontSize: 9 }}>{t}</text>
       ))}
       {[X.inWall, X.outWall].map((x, i) => (
         <g key={x}>
-          <line x1={x} y1={28} x2={x} y2={H - 8} stroke={guarded ? '#35c48a' : '#36414f'} strokeWidth={guarded ? 2 : 1} strokeDasharray={guarded ? '0' : '3 5'} opacity={guarded ? 0.7 : 1} />
-          <rect x={x - 38} y={24} width={76} height={14} fill="#0b0e12" />
-          <text x={x} y={34} textAnchor="middle" fill={guarded ? '#35c48a' : '#56626f'} style={{ fontSize: 8.5, letterSpacing: '.14em', fontFamily: 'IBM Plex Mono' }}>{guarded ? (i ? 'EGRESS ▣' : 'INGRESS ▣') : 'NO FIREWALL'}</text>
+          <line x1={x} y1={28} x2={x} y2={H - 8} stroke={guarded ? '#3fcf8e' : '#333333'} strokeWidth={1} strokeDasharray={guarded ? '0' : '3 5'} opacity={guarded ? 0.45 : 1} />
+          <rect x={x - 38} y={24} width={76} height={14} fill="#000000" />
+          <text x={x} y={34} textAnchor="middle" fill={guarded ? '#3fcf8e' : '#5c5c5c'} style={{ fontSize: 8.5, letterSpacing: '.1em', fontFamily: 'IBM Plex Mono' }}>{guarded ? (i ? 'EGRESS' : 'INGRESS') : 'NO FIREWALL'}</text>
         </g>
       ))}
 
@@ -109,7 +109,7 @@ export function LinkGraph({ events, mode, selected, onSelect }: { events: Scylla
         return (
           <g key={`e-${c.callId}`}>
             <path d={`M${X.src + NW} ${y} C ${X.inWall - 30} ${y}, ${X.inWall - 30} ${y}, ${X.inWall} ${y}`} stroke={col} strokeWidth={1.6} fill="none" className={done ? '' : 'flow'} />
-            <path d={`M${X.inWall} ${y} C ${X.inWall + 60} ${y}, ${X.agent - 60} ${agentY}, ${X.agent} ${agentY}`} stroke={blockedAtWall ? '#36414f' : col} strokeWidth={1.4} fill="none" strokeDasharray={blockedAtWall ? '2 4' : undefined} />
+            <path d={`M${X.inWall} ${y} C ${X.inWall + 60} ${y}, ${X.agent - 60} ${agentY}, ${X.agent} ${agentY}`} stroke={blockedAtWall ? '#333333' : col} strokeWidth={1.4} fill="none" strokeDasharray={blockedAtWall ? '2 4' : undefined} />
             {guarded && c.ingress && c.ingress.verdict !== 'allow' && <WallMark x={X.inWall} y={y} tone={tone} glyph={c.ingress.verdict === 'quarantine' ? '✕' : '≈'} />}
           </g>
         );
@@ -143,15 +143,15 @@ export function LinkGraph({ events, mode, selected, onSelect }: { events: Scylla
             {c.effect && !c.effect.blocked && (
               <g>
                 {isLeak(c) && <circle cx={X.dest + 8} cy={y} r={6} fill="none" stroke={toneHex.hostile} className="ping" />}
-                <rect x={X.dest} y={y - 13} width={92} height={26} fill="#0b0e12" stroke={toneHex[tone]} strokeWidth={1} />
+                <rect x={X.dest} y={y - 13} width={92} height={26} rx={6} fill="#0b0b0b" stroke={`${toneHex[tone]}80`} strokeWidth={1} />
                 <text x={X.dest + 6} y={y - 2} fill={toneHex[tone]} style={{ fontSize: 8.5, fontFamily: 'IBM Plex Mono', letterSpacing: '.08em' }}>{isLeak(c) ? 'EXFIL ▲' : c.effect.external ? 'EXTERNAL' : 'INTERNAL'}</text>
-                <text x={X.dest + 6} y={y + 9} fill="#a9b3bd" style={{ fontSize: 8.5, fontFamily: 'IBM Plex Mono' }}>{short(destOf(c), 15)}</text>
+                <text x={X.dest + 6} y={y + 9} fill="#b4b4b4" style={{ fontSize: 8.5, fontFamily: 'IBM Plex Mono' }}>{short(destOf(c), 15)}</text>
               </g>
             )}
           </g>
         );
       })}
-      {!calls.length && <text x={W / 2} y={H - 18} textAnchor="middle" fill="#56626f" style={{ fontSize: 10, fontFamily: 'IBM Plex Mono', letterSpacing: '.12em' }}>AWAITING TASKING</text>}
+      {!calls.length && <text x={W / 2} y={H - 18} textAnchor="middle" fill="#5c5c5c" style={{ fontSize: 10, fontFamily: 'IBM Plex Mono', letterSpacing: '.12em' }}>AWAITING TASKING</text>}
     </svg>
   );
 }
@@ -159,7 +159,7 @@ export function LinkGraph({ events, mode, selected, onSelect }: { events: Scylla
 function WallMark({ x, y, tone, glyph }: { x: number; y: number; tone: Tone; glyph: string }) {
   return (
     <g>
-      <rect x={x - 9} y={y - 9} width={18} height={18} fill="#07090c" stroke={toneHex[tone]} strokeWidth={1.5} transform={`rotate(45 ${x} ${y})`} />
+      <circle cx={x} cy={y} r={9} fill="#000000" stroke={toneHex[tone]} strokeWidth={1.2} />
       <text x={x} y={y + 4} textAnchor="middle" fill={toneHex[tone]} style={{ fontSize: 11, fontWeight: 700 }}>{glyph}</text>
     </g>
   );
@@ -169,16 +169,16 @@ function Node({ x, y, w = NW, tone, glyph, title, sub, selected, onClick, badge,
   const col = toneHex[tone];
   return (
     <g transform={`translate(${x} ${y - NH / 2})`} onClick={(e) => { e.stopPropagation(); onClick?.(); }} style={{ cursor: onClick ? 'pointer' : 'default' }}>
-      {selected && <rect x={-4} y={-4} width={w + 8} height={NH + 8} fill="none" stroke="#3d9df3" strokeWidth={1} strokeDasharray="3 2" />}
-      <rect width={w} height={NH} fill="#0e1217" stroke={col} strokeWidth={1.2} />
-      <rect width={NH} height={NH} fill={`${col}22`} />
+      {selected && <rect x={-3} y={-3} width={w + 6} height={NH + 6} rx={9} fill="none" stroke="#ececec" strokeOpacity={0.5} strokeWidth={1} />}
+      <rect width={w} height={NH} rx={7} fill="#0b0b0b" stroke={tone === 'muted' ? '#262626' : `${col}80`} strokeWidth={1} />
+      <rect x={6} y={6} width={NH - 12} height={NH - 12} rx={5} fill={`${col}1f`} />
       <g transform={`translate(${NH / 2 - 8} ${NH / 2 - 8})`}><Glyph kind={glyph} size={16} color={col} /></g>
-      <text x={NH + 7} y={15} fill="#d3dae0" style={{ fontSize: 10, fontFamily: 'IBM Plex Mono', textDecoration: strike ? 'line-through' : undefined }}>{short(title, Math.floor((w - NH - 10) / 6.2))}</text>
-      <text x={NH + 7} y={28} fill={tone === 'muted' ? '#7f8b97' : col} style={{ fontSize: 9, fontFamily: 'IBM Plex Mono' }}>{short(sub, Math.floor((w - NH - 10) / 5.6))}</text>
+      <text x={NH + 7} y={15} fill="#ececec" style={{ fontSize: 10, fontFamily: 'IBM Plex Mono', textDecoration: strike ? 'line-through' : undefined }}>{short(title, Math.floor((w - NH - 10) / 6.2))}</text>
+      <text x={NH + 7} y={28} fill={tone === 'muted' ? '#8a8a8a' : col} style={{ fontSize: 9, fontFamily: 'IBM Plex Mono' }}>{short(sub, Math.floor((w - NH - 10) / 5.6))}</text>
       {badge && (
         <g transform={`translate(${w - 8} -6)`}>
-          <rect width={14} height={14} fill={col} />
-          <text x={7} y={10.5} textAnchor="middle" fill="#07090c" style={{ fontSize: 9, fontFamily: 'IBM Plex Mono', fontWeight: 700 }}>{badge}</text>
+          <rect width={14} height={14} rx={7} fill={col} />
+          <text x={7} y={10.5} textAnchor="middle" fill="#000000" style={{ fontSize: 9, fontFamily: 'IBM Plex Mono', fontWeight: 700 }}>{badge}</text>
         </g>
       )}
     </g>

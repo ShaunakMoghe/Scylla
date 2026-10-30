@@ -2,15 +2,14 @@ import type { ReactNode } from 'react';
 
 export type Tone = 'friendly' | 'hostile' | 'caution' | 'clear' | 'intel' | 'muted';
 export const toneText: Record<Tone, string> = { friendly: 'text-friendly', hostile: 'text-hostile', caution: 'text-caution', clear: 'text-clear', intel: 'text-intel', muted: 'text-g-300' };
-export const toneHex: Record<Tone, string> = { friendly: '#3d9df3', hostile: '#ff4d4d', caution: '#f2a93b', clear: '#35c48a', intel: '#a77bf3', muted: '#56626f' };
+export const toneHex: Record<Tone, string> = { friendly: '#7aa2ff', hostile: '#ff5f56', caution: '#e5a443', clear: '#3fcf8e', intel: '#a58bff', muted: '#5c5c5c' };
 
 export function Panel({ title, right, children, className = '', bodyClass = '' }: { title?: ReactNode; right?: ReactNode; children: ReactNode; className?: string; bodyClass?: string }) {
   return (
-    <section className={`flex flex-col min-h-0 bg-g-900 border border-g-700 ${className}`}>
+    <section className={`flex flex-col min-h-0 bg-black ${className}`}>
       {title !== undefined && (
-        <header className="flex items-center gap-2 h-7 px-2.5 border-b border-g-700 bg-g-850 shrink-0">
-          <span className="w-1 h-3 bg-friendly/70" />
-          <span className="label text-g-200">{title}</span>
+        <header className="flex items-center gap-2 h-9 px-4 border-b border-g-750 shrink-0">
+          <span className="label !text-g-300">{title}</span>
           <div className="ml-auto flex items-center gap-1.5">{right}</div>
         </header>
       )}
@@ -22,17 +21,17 @@ export function Panel({ title, right, children, className = '', bodyClass = '' }
 export function Tag({ children, tone = 'muted', solid }: { children: ReactNode; tone?: Tone; solid?: boolean }) {
   const hex = toneHex[tone];
   return (
-    <span className="inline-flex items-center h-[18px] px-1.5 font-mono text-[10px] uppercase tracking-wider whitespace-nowrap border"
-      style={solid ? { background: hex, color: '#07090c', borderColor: hex } : { color: tone === 'muted' ? '#a9b3bd' : hex, borderColor: `${hex}66`, background: `${hex}14` }}>
+    <span className="inline-flex items-center h-[18px] px-1.5 rounded-[3px] font-mono text-[10px] uppercase tracking-[.04em] whitespace-nowrap"
+      style={solid ? { background: hex, color: '#000000' } : { color: tone === 'muted' ? '#9a9a9a' : hex, background: tone === 'muted' ? 'rgba(255,255,255,.05)' : `${hex}1a` }}>
       {children}
     </span>
   );
 }
 
 export function Btn({ children, onClick, disabled, primary, danger }: { children: ReactNode; onClick: () => void; disabled?: boolean; primary?: boolean; danger?: boolean }) {
-  const c = primary ? 'bg-friendly/90 text-g-950 hover:bg-friendly border-friendly' : danger ? 'border-hostile/60 text-hostile hover:bg-hostile/10' : 'border-g-500 text-g-100 hover:bg-g-700';
+  const c = primary ? 'bg-g-100 text-black border-g-100 hover:bg-white' : danger ? 'border-hostile/35 text-hostile hover:bg-hostile/10' : 'border-g-600 text-g-100 hover:bg-g-800';
   return (
-    <button onClick={onClick} disabled={disabled} className={`h-7 px-3 border font-cond text-[11px] font-semibold uppercase tracking-[.12em] disabled:opacity-35 disabled:cursor-not-allowed ${c}`}>
+    <button onClick={onClick} disabled={disabled} className={`h-7 px-3 rounded-md border font-sans text-[12px] font-medium disabled:opacity-35 disabled:cursor-not-allowed ${c}`}>
       {children}
     </button>
   );
@@ -40,11 +39,10 @@ export function Btn({ children, onClick, disabled, primary, danger }: { children
 
 export function Kpi({ label, value, sub, tone = 'muted' }: { label: string; value: string; sub?: string; tone?: Tone }) {
   return (
-    <div className="bg-g-900 border border-g-700 px-3 py-2.5 relative">
-      <span className="absolute left-0 top-0 h-full w-[2px]" style={{ background: toneHex[tone] }} />
-      <div className="label">{label}</div>
-      <div className={`font-mono text-[28px] leading-8 mt-1 ${toneText[tone]}`}>{value}</div>
-      {sub && <div className="font-mono text-[10px] text-g-400 mt-0.5">{sub}</div>}
+    <div className="bg-black px-5 py-4">
+      <div className="label flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full" style={{ background: toneHex[tone] }} />{label}</div>
+      <div className={`font-sans font-light text-[26px] leading-8 mt-1.5 tracking-tight ${tone === 'muted' || tone === 'intel' || tone === 'friendly' ? 'text-g-100' : toneText[tone]}`}>{value}</div>
+      {sub && <div className="font-mono text-[10.5px] text-g-400 mt-1">{sub}</div>}
     </div>
   );
 }

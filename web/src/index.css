@@ -2,10 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 html, body, #root { height: 100%; }
-body { color: #c9d1d9; font-family: "IBM Plex Sans", ui-sans-serif, system-ui; font-size: 13px; -webkit-font-smoothing: antialiased; }
-::-webkit-scrollbar { width: 6px; height: 6px; } ::-webkit-scrollbar-thumb { background: #26303d; } ::-webkit-scrollbar-track { background: transparent; }
-.grid-bg { background-image: linear-gradient(rgba(61,157,243,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(61,157,243,.05) 1px, transparent 1px); background-size: 24px 24px; }
-.label { font-family: "IBM Plex Sans Condensed", "IBM Plex Sans", sans-serif; font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: #7f8b97; font-weight: 600; }
+body { background: #000; color: #d4d4d4; font-feature-settings: "tnum" 1, "ss01" 1; font-family: "IBM Plex Sans", ui-sans-serif, system-ui; font-size: 13px; -webkit-font-smoothing: antialiased; }
+::-webkit-scrollbar { width: 6px; height: 6px; } ::-webkit-scrollbar-thumb { background: #1f1f1f; border-radius: 3px; } ::-webkit-scrollbar-track { background: transparent; }
+.grid-bg { background: #000; }
+.label { font-family: "IBM Plex Sans", sans-serif; font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: #7d7d7d; font-weight: 500; }
 @keyframes slidein { from { opacity: 0; transform: translateX(-4px); } to { opacity: 1; transform: none; } }
 .ev { animation: slidein .2s ease-out; }
 @keyframes dash { to { stroke-dashoffset: -16; } }
@@ -15,5 +15,8 @@ body { color: #c9d1d9; font-family: "IBM Plex Sans", ui-sans-serif, system-ui; f
 @keyframes blink { 50% { opacity: .35; } }
 .blink { animation: blink 1.2s step-end infinite; }
 .scan { position: relative; overflow: hidden; }
-.scan::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 0, rgba(61,157,243,.06) 50%, transparent 100%); height: 40%; animation: scan 3.5s linear infinite; pointer-events: none; }
+.scan::after { display: none; content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 0, rgba(61,157,243,.06) 50%, transparent 100%); height: 40%; animation: scan 3.5s linear infinite; pointer-events: none; }
 @keyframes scan { from { transform: translateY(-100%); } to { transform: translateY(260%); } }
+
+::selection { background: rgba(122,162,255,.25); }
+button { transition: background-color .15s, border-color .15s, color .15s, opacity .15s; }

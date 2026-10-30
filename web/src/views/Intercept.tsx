@@ -30,32 +30,31 @@ export function Intercept({ store, run, waitEnd }: Props) {
     setBusy(false);
   };
 
-  const lanes = [pair.off && { id: pair.off, label: 'A · UNPROTECTED' }, pair.on && { id: pair.on, label: 'B · BEHIND SCYLLA' }].filter(Boolean) as { id: string; label: string }[];
+  const lanes = [pair.off && { id: pair.off, label: 'Unprotected' }, pair.on && { id: pair.on, label: 'Behind Scylla' }].filter(Boolean) as { id: string; label: string }[];
 
   return (
     <div className="flex-1 min-h-0 grid grid-cols-[230px_1fr_310px] 2xl:grid-cols-[260px_1fr_360px] gap-px bg-g-700">
       <Targets scenarios={scenarios} sel={sel} setSel={(s) => { setSel(s); setPair({}); setFocus(null); }} q={q} setQ={setQ} />
-      <div className="min-h-0 min-w-0 flex flex-col bg-g-950">
-        <div className="shrink-0 bg-g-900 border-b border-g-700 px-3 py-2 flex items-start gap-3">
-          <div className="w-9 h-9 grid place-items-center border border-g-600 shrink-0" style={{ color: scenario?.type === 'benign' ? '#3d9df3' : '#ff4d4d' }}>
+      <div className="min-h-0 min-w-0 flex flex-col bg-black">
+        <div className="shrink-0 bg-black border-b border-g-750 px-5 py-4 flex items-start gap-4">
+          <div className="w-9 h-9 grid place-items-center rounded-lg bg-white/[.04] shrink-0" style={{ color: scenario?.type === 'benign' ? '#7aa2ff' : '#ff5f56' }}>
             <Glyph kind={scenario?.type === 'benign' ? 'user' : vectorGlyph(scenario?.vector)} size={18} />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="font-mono text-[10px] text-g-400 whitespace-nowrap">{scenario ? `TGT-${hash(scenario.id).slice(0, 6)}` : ''}</span>
-              <span className="text-g-100 font-medium truncate">{scenario?.title ?? sel}</span>
+              <span className="text-g-100 text-[15px] font-medium tracking-[-.01em] truncate">{scenario?.title ?? sel}</span>
             </div>
-            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+            <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
               {scenario?.type === 'attack' ? <>
                 <Tag tone="hostile">hostile</Tag><Tag>{scenario.vector}</Tag><Tag>{scenario.technique}</Tag>
                 {scenario.origin === 'redteam' && <Tag tone="intel">red team R{scenario.round}</Tag>}
-                <span className="font-mono text-[10.5px] text-g-300 truncate">OBJECTIVE · {scenario.goal?.description}</span>
-              </> : scenario ? <><Tag tone="friendly">benign</Tag><span className="font-mono text-[10.5px] text-g-300">MUST COMPLETE WITHOUT FRICTION</span></> : null}
+                <span className="text-[12px] text-g-400 truncate ml-1">{scenario.goal?.description}</span>
+              </> : scenario ? <><Tag tone="friendly">benign</Tag><span className="text-[12px] text-g-400 ml-1">Must complete without friction</span></> : null}
             </div>
-            <div className="font-mono text-[11px] text-g-200 mt-1.5 truncate"><span className="text-g-500">TASKING ▸ </span>“{scenario?.task}”</div>
+            <div className="text-[12.5px] text-g-200 mt-2 truncate"><span className="text-g-500">Task  </span>{scenario?.task}</div>
           </div>
           <div className="flex gap-1.5 shrink-0">
-            <Btn primary disabled={busy} onClick={() => go(['off', 'enforce'])}>▶ Compare</Btn>
+            <Btn primary disabled={busy} onClick={() => go(['off', 'enforce'])}>Run compare</Btn>
             <Btn disabled={busy} onClick={() => go(['enforce'])}>Enforce</Btn>
             <Btn disabled={busy} onClick={() => go(['shadow'])}>Shadow</Btn>
           </div>
@@ -63,8 +62,8 @@ export function Intercept({ store, run, waitEnd }: Props) {
         {lanes.length === 0 ? (
           <div className="flex-1 grid place-items-center grid-bg">
             <div className="text-center">
-              <div className="label mb-2">No active tasking</div>
-              <div className="font-mono text-[11px] text-g-400 max-w-sm">Run COMPARE to execute the same task on the same agent and world, once exposed and once behind Scylla.</div>
+              <div className="text-[14px] text-g-200 mb-1.5">No run yet</div>
+              <div className="text-[12.5px] text-g-400 max-w-sm leading-5">Compare runs the same task on the same agent twice: once exposed, once behind Scylla.</div>
             </div>
           </div>
         ) : (
@@ -89,21 +88,21 @@ function Targets({ scenarios, sel, setSel, q, setQ }: { scenarios: Scenario[]; s
   }, [scenarios, q]);
   return (
     <Panel title="Target packages" right={<span className="font-mono text-[10px] text-g-400">{scenarios.length}</span>} bodyClass="flex flex-col">
-      <div className="p-2 border-b border-g-700">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="SEARCH OBJECTS…" className="w-full h-7 px-2 bg-g-950 border border-g-600 font-mono text-[11px] text-g-100 placeholder:text-g-500 outline-none focus:border-friendly" />
+      <div className="p-2 border-b border-g-750">
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search scenarios" className="w-full h-8 px-3 rounded-md bg-white/[.04] border border-transparent font-sans text-[12px] text-g-100 placeholder:text-g-400 outline-none focus:border-g-600" />
       </div>
       <div className="flex-1 overflow-y-auto">
         {groups.map(([g, list]) => (
           <div key={g}>
-            <div className="sticky top-0 bg-g-850 px-2.5 h-6 flex items-center gap-2 border-b border-g-700">
-              <Glyph kind={g === 'benign' ? 'user' : vectorGlyph(g)} size={11} color={g === 'benign' ? '#3d9df3' : '#ff4d4d'} />
+            <div className="sticky top-0 bg-black px-2.5 h-6 flex items-center gap-2 border-b border-g-750">
+              <Glyph kind={g === 'benign' ? 'user' : vectorGlyph(g)} size={11} color={g === 'benign' ? '#7aa2ff' : '#ff5f56'} />
               <span className="label">{g === 'benign' ? 'benign tasks' : `${g} vector`}</span>
               <span className="ml-auto font-mono text-[10px] text-g-500">{list.length}</span>
             </div>
             {list.map((s) => (
               <button key={s.id} onClick={() => setSel(s.id)}
-                className={`w-full text-left px-2.5 py-1.5 flex items-center gap-2 border-l-2 ${sel === s.id ? 'border-friendly bg-friendly/10' : 'border-transparent hover:bg-g-800'}`}>
-                <span className={`w-1.5 h-1.5 shrink-0 ${s.type === 'benign' ? 'bg-friendly' : s.origin === 'redteam' ? 'bg-intel' : 'bg-hostile'}`} />
+                className={`w-full text-left px-2.5 py-1.5 flex items-center gap-2 rounded-md mx-1.5 w-[calc(100%-12px)] ${sel === s.id ? 'bg-white/[.07]' : 'hover:bg-white/[.03]'}`}>
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${s.type === 'benign' ? 'bg-friendly' : s.origin === 'redteam' ? 'bg-intel' : 'bg-hostile'}`} />
                 <span className="min-w-0">
                   <span className={`block truncate text-[12px] ${sel === s.id ? 'text-g-100' : 'text-g-200'}`}>{s.title}</span>
                   <span className="block font-mono text-[9.5px] text-g-500 truncate">{s.id}</span>
@@ -130,17 +129,16 @@ function Lane({ label, runId, events, scenario, focus, onFocus, active }: { labe
   const o = outcome(end, scenario);
   useEffect(() => { document.getElementById(`feed-end-${runId}`)?.scrollIntoView({ block: 'end' }); }, [events.length, runId]);
   return (
-    <div className={`min-h-0 min-w-0 flex flex-col bg-g-900 ${active ? 'outline outline-1 outline-friendly/40 -outline-offset-1' : ''}`}>
-      <header className="h-7 shrink-0 flex items-center gap-2 px-2.5 border-b border-g-700 bg-g-850">
-        <span className={`w-1 h-3 ${start?.mode === 'off' ? 'bg-hostile' : 'bg-clear'}`} />
-        <span className="label text-g-200 whitespace-nowrap">{label}</span>
+    <div className={`min-h-0 min-w-0 flex flex-col bg-black ${active ? '' : ''}`}>
+      <header className="h-9 shrink-0 flex items-center gap-2 px-4 border-b border-g-750 bg-black">
+        <span className="text-[12.5px] font-medium text-g-100 whitespace-nowrap">{label}</span>
         {start && <Tag tone={start.mode === 'off' ? 'hostile' : start.mode === 'shadow' ? 'caution' : 'clear'}>{start.mode === 'off' ? 'no firewall' : start.mode}</Tag>}
-        <span className="ml-auto">{o ? <Tag tone={o.tone} solid>{o.text}</Tag> : <span className="font-mono text-[10px] text-caution blink">● EXECUTING</span>}</span>
+        <span className="ml-auto">{o ? <Tag tone={o.tone} solid>{o.text}</Tag> : <span className="font-sans text-[11px] text-g-300">Running…</span>}</span>
       </header>
-      <div className="shrink-0 max-h-[55%] overflow-hidden border-b border-g-700 bg-g-950" onClick={() => onFocus(undefined)}>
+      <div className="shrink-0 max-h-[55%] overflow-hidden border-b border-g-750 bg-black" onClick={() => onFocus(undefined)}>
         <LinkGraph events={events} mode={start?.mode} selected={focus} onSelect={onFocus} />
       </div>
-      <div className="h-6 shrink-0 flex items-center px-2.5 border-b border-g-700 bg-g-850">
+      <div className="h-8 shrink-0 flex items-center px-4 border-b border-g-750 bg-black">
         <span className="label">Activity feed</span>
         {end && <span className="ml-auto font-mono text-[9.5px] text-g-400">STEPS {end.steps} · CALLS {end.modelCalls} · BLOCKED {end.blockedCalls} · FLAGS {end.ingressFlags} · SCYLLA {Math.round(end.scyllaMs)}MS</span>}
       </div>
@@ -156,7 +154,7 @@ function FeedRow({ e, onFocus, focus, t0 }: { e: ScyllaEvent; onFocus: (c?: stri
   const t = `+${((e.ts - t0) / 1000).toFixed(2)}s`;
   const row = (tone: Tone | 'text', tag: string, body: React.ReactNode, callId?: string) => (
     <div onClick={() => callId && onFocus(callId)}
-      className={`ev grid grid-cols-[52px_74px_1fr] gap-2 px-2.5 py-[3px] border-b border-g-800 ${callId ? 'cursor-pointer hover:bg-g-800' : ''} ${callId && focus === callId ? 'bg-friendly/10' : ''}`}>
+      className={`ev grid grid-cols-[52px_74px_1fr] gap-3 px-4 py-[5px] border-b border-white/[.04] ${callId ? 'cursor-pointer hover:bg-white/[.03]' : ''} ${callId && focus === callId ? 'bg-white/[.06]' : ''}`}>
       <span className="text-g-500">{t}</span>
       <span className={tone === 'text' ? 'text-g-300' : { friendly: 'text-friendly', hostile: 'text-hostile', caution: 'text-caution', clear: 'text-clear', intel: 'text-intel', muted: 'text-g-400' }[tone]}>{tag}</span>
       <span className="min-w-0 break-all text-g-200">{body}</span>
@@ -217,8 +215,8 @@ function Inspector({ focus, events, scenario }: { focus: { runId: string; callId
             <div>
               <div className="label mb-1.5">Objects</div>
               {calls.map((c) => (
-                <div key={c.callId} className="flex items-center gap-2 py-1 border-b border-g-800 font-mono text-[11px]">
-                  <Glyph kind={toolGlyph(c.tool)} size={12} color={isLeak(c) ? '#ff4d4d' : '#7f8b97'} />
+                <div key={c.callId} className="flex items-center gap-2 py-1 border-b border-white/[.04] font-mono text-[11px]">
+                  <Glyph kind={toolGlyph(c.tool)} size={12} color={isLeak(c) ? '#ff5f56' : '#8a8a8a'} />
                   <span className="text-g-200">{c.tool}</span>
                   <span className="ml-auto text-g-500">{c.ingress?.verdict ?? c.egress?.verdict ?? (c.effect ? 'executed' : '')}</span>
                 </div>
@@ -227,7 +225,7 @@ function Inspector({ focus, events, scenario }: { focus: { runId: string; callId
             {final && (
               <div>
                 <div className="label mb-1.5">Final answer</div>
-                <div className="font-mono text-[11px] text-g-200 whitespace-pre-wrap break-words bg-g-950 border border-g-700 p-2"><Highlight text={final.text} /></div>
+                <div className="font-mono text-[11px] text-g-200 whitespace-pre-wrap break-words bg-black border border-g-750 p-2"><Highlight text={final.text} /></div>
               </div>
             )}
           </div>
@@ -243,7 +241,7 @@ function CallDetail({ call, runId }: { call: CallInfo; runId: string }) {
   return (
     <div className="p-3 space-y-3">
       <div className="flex items-center gap-2">
-        <div className="w-8 h-8 grid place-items-center border border-g-600"><Glyph kind={toolGlyph(call.tool)} size={16} color="#3d9df3" /></div>
+        <div className="w-8 h-8 grid place-items-center border border-g-600"><Glyph kind={toolGlyph(call.tool)} size={16} color="#7aa2ff" /></div>
         <div>
           <div className="font-mono text-[12px] text-g-100">{call.tool}</div>
           <div className="font-mono text-[9.5px] text-g-500">{call.kind === 'read' ? 'INGRESS OBJECT' : 'EGRESS ACTION'} · {call.callId.slice(0, 10)}</div>
@@ -281,13 +279,13 @@ function CallDetail({ call, runId }: { call: CallInfo; runId: string }) {
       {call.preview && (
         <div>
           <div className="label mb-1">{call.ingress && call.ingress.verdict !== 'allow' ? 'Content delivered to agent' : 'Content'}</div>
-          <div className="font-mono text-[10.5px] text-g-300 whitespace-pre-wrap break-words bg-g-950 border border-g-700 p-2 max-h-56 overflow-y-auto">{unfence(call.preview)}</div>
+          <div className="font-mono text-[10.5px] text-g-300 whitespace-pre-wrap break-words bg-black border border-g-750 p-2 max-h-56 overflow-y-auto">{unfence(call.preview)}</div>
         </div>
       )}
       {call.egress && (
         <div>
           <div className="label mb-1 flex items-center gap-2">Egress decision <Tag tone={call.egress.verdict === 'block' ? 'hostile' : call.egress.verdict === 'ask_human' ? 'caution' : 'clear'}>{call.egress.verdict === 'ask_human' ? 'held' : call.egress.verdict}</Tag></div>
-          {call.egress.judge && <div className="bg-g-950 border border-g-700 p-2 mb-1.5">
+          {call.egress.judge && <div className="bg-black border border-g-750 p-2 mb-1.5">
             <div className="font-mono text-[9.5px] text-g-400 mb-0.5">MUSE SPARK JUDGE · {call.egress.judge.aligned ? 'ALIGNED' : 'MISALIGNED'} · RISK {call.egress.judge.risk.toUpperCase()}</div>
             <div className="text-[12px] text-g-100">{call.egress.judge.reason}</div>
           </div>}
@@ -319,7 +317,7 @@ function Findings({ f }: { f: Finding[] }) {
   return (
     <div className="mt-1.5 space-y-1.5">
       {f.map((x, i) => (
-        <div key={i} className="border-l-2 pl-2" style={{ borderColor: x.severity === 'high' ? '#ff4d4d' : x.severity === 'medium' ? '#f2a93b' : '#56626f' }}>
+        <div key={i} className="border-l-2 pl-2" style={{ borderColor: x.severity === 'high' ? '#ff5f56' : x.severity === 'medium' ? '#e5a443' : '#5c5c5c' }}>
           <div className="flex items-center gap-1.5"><Tag tone={x.severity === 'high' ? 'hostile' : x.severity === 'medium' ? 'caution' : 'muted'}>{x.layer}</Tag>{x.ruleId && <span className="font-mono text-[9.5px] text-intel">{x.ruleId}</span>}{x.confidence !== undefined && <span className="font-mono text-[9.5px] text-g-500">conf {x.confidence.toFixed(2)}</span>}</div>
           <div className="text-[11.5px] text-g-200 mt-0.5">{x.reason}</div>
           {x.quote && <div className="font-mono text-[10px] text-hostile/90 mt-0.5 break-all">“{short(x.quote, 200)}”</div>}
@@ -334,7 +332,7 @@ function Timings({ t }: { t: { layer: string; ms: number; model?: string }[] }) 
   const total = t.reduce((a, x) => a + x.ms, 0) || 1;
   return (
     <div className="mt-2">
-      <div className="flex h-1.5 bg-g-800">{t.map((x, i) => <div key={i} title={`${x.layer} ${Math.round(x.ms)}ms`} style={{ width: `${(x.ms / total) * 100}%`, background: ['#3d9df3', '#a77bf3', '#35c48a', '#f2a93b', '#ff4d4d', '#7f8b97'][i % 6] }} />)}</div>
+      <div className="flex h-1.5 bg-g-800">{t.map((x, i) => <div key={i} title={`${x.layer} ${Math.round(x.ms)}ms`} style={{ width: `${(x.ms / total) * 100}%`, background: ['#7aa2ff', '#a58bff', '#3fcf8e', '#e5a443', '#ff5f56', '#8a8a8a'][i % 6] }} />)}</div>
       <div className="flex flex-wrap gap-x-2 mt-1 font-mono text-[9.5px] text-g-400">{t.map((x, i) => <span key={i} title={x.model}>{x.layer} {x.ms < 1 ? '<1' : Math.round(x.ms)}ms</span>)}</div>
     </div>
   );
@@ -343,10 +341,10 @@ function Timings({ t }: { t: { layer: string; ms: number; model?: string }[] }) 
 const ORIGIN_TONE: Record<string, Tone> = { task: 'clear', user: 'clear', sender: 'friendly', internal: 'friendly', untrusted: 'hostile', unknown: 'caution' };
 function Provenance({ p }: { p: NonNullable<EgressDecision['provenance']> }) {
   return (
-    <div className="bg-g-950 border border-intel/40 p-2 mb-1.5">
+    <div className="bg-black border border-intel/40 p-2 mb-1.5">
       <div className="font-mono text-[9.5px] text-intel mb-1">ARGUMENT PROVENANCE · WHO CHOSE EACH CONTROL VALUE</div>
       {p.map((a, i) => (
-        <div key={i} className="py-1 border-t border-g-800 first:border-t-0">
+        <div key={i} className="py-1 border-t border-white/[.04] first:border-t-0">
           <div className="flex items-center gap-2 font-mono text-[10.5px]">
             <span className="text-g-400">{a.arg}</span><span className="text-g-100 truncate">{a.atom}</span>
             <span className="ml-auto"><Tag tone={ORIGIN_TONE[a.origin] ?? 'muted'}>{a.origin === 'task' ? 'from your task' : a.origin}</Tag></span>
