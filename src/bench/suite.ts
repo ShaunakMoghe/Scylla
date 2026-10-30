@@ -35,9 +35,13 @@ export async function runSuite(options: {
   reportId?: string;
   reportDirectory?: string;
 }): Promise<{ report: BenchReport; results: RunResult[] }> {
+  const allScenarios = options.scenarios ?? await loadScenarios();
+  const only = options.only?.filter((id) => id.length > 0);
+  const unknownIds = only?.filter((id) => !allScenarios.some((scenario) => scenario.id === id));
+  if (unknownIds?.length) throw new Error(`Unknown scenario id(s): ${[...new Set(unknownIds)].join(', ')}`);
+  const scenarios = allScenarios.filter((scenario) => !only?.length || only.includes(scenario.id));
   const provider = options.modelProvider ?? ((options.provider ?? selectedProviderKind()) === 'live' ? new LiveProvider() : new MockProvider());
   const policy = await loadPolicyVersion(options.policyVersion);
-  const scenarios = (options.scenarios ?? await loadScenarios()).filter((scenario) => !options.only?.length || options.only.includes(scenario.id));
   const results: RunResult[] = [];
   const errors: { scenarioId: string; message: string }[] = [];
   for (const [index, scenario] of scenarios.entries()) {
@@ -70,6 +74,7 @@ export async function runSuite(options: {
     provider: provider.kind,
     mode: options.mode,
     profile: options.profile ?? 'standard',
+    ...(only?.length ? { only } : {}),
     policyVersion: policy.version,
     attacks: {
       total: attacks.length,

@@ -1,3 +1,4 @@
+import { resolve } from 'node:path';
 import { runSuite } from './suite.js';
 import { loadScenarios } from './run.js';
 
@@ -16,16 +17,21 @@ function table(rows: { id: string; type: string; success: boolean; blocked: numb
 const args = process.argv.slice(2);
 const mode = argValue(args, '--mode') ?? 'enforce';
 if (!['off', 'shadow', 'enforce'].includes(mode)) throw new Error(`Unknown mode: ${mode}`);
-const only = argValue(args, '--only')?.split(',').filter(Boolean);
+const onlyArg = argValue(args, '--only');
+if (args.includes('--only') && !onlyArg) throw new Error('--only requires a comma-separated list of scenario ids');
+const only = onlyArg?.split(',').map((id) => id.trim()).filter(Boolean);
+if (onlyArg !== undefined && !only?.length) throw new Error('--only requires at least one scenario id');
 const policyArg = argValue(args, '--policy');
 const policyVersion = policyArg === undefined ? undefined : Number.parseInt(policyArg, 10);
 if (policyVersion !== undefined && (!Number.isSafeInteger(policyVersion) || policyVersion < 0)) throw new Error(`Invalid policy version: ${policyArg}`);
+const reportDirectory = process.env.WARDEN_REPORT_DIRECTORY;
 const { report, results } = await runSuite({
   mode: mode as 'off' | 'shadow' | 'enforce',
   provider: argValue(args, '--provider') as 'mock' | 'live' | undefined,
   profile: argValue(args, '--profile') as 'standard' | 'compliant' | undefined,
   only,
   policyVersion,
+  reportDirectory,
 });
 const scenarioById = new Map((await loadScenarios()).map((scenario) => [scenario.id, scenario.type] as const));
 console.log(`profile: ${report.profile ?? 'standard'}`);
@@ -41,4 +47,4 @@ console.log(`ASR by vector: ${Object.entries(report.attacks.byVector).map(([vect
 console.log(`Utility: ${report.benign.passed}/${report.benign.total} (${(100 * report.benign.utility).toFixed(1)}%)`);
 console.log(`Median Warden ms: ${report.medianWardenMs.toFixed(2)}`);
 if (report.errors?.length) console.log(`Errors: ${report.errors.length}`);
-console.log(`Report: runs/${report.id}.json`);
+console.log(`Report: ${reportDirectory ? resolve(reportDirectory, `${report.id}.json`) : `runs/${report.id}.json`}`);

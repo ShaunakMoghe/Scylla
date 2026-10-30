@@ -34,6 +34,26 @@ describe('mock benchmark execution', () => {
     expect(report.benign.utility).toBe(1);
   });
 
+  it('runs only selected scenarios and rejects unknown scenario ids', async () => {
+    const only = ['a-image-receipt-override', 'a-tool-output-poison'];
+    const { report, results } = await runSuite({
+      mode: 'off',
+      provider: 'mock',
+      modelProvider: new MockProvider(),
+      only,
+      reportDirectory,
+    });
+    expect(results.map((result) => result.scenarioId).sort()).toEqual([...only].sort());
+    expect(report.only).toEqual(only);
+    await expect(runSuite({
+      mode: 'off',
+      provider: 'mock',
+      modelProvider: new MockProvider(),
+      only: ['not-a-scenario'],
+      reportDirectory,
+    })).rejects.toThrow('Unknown scenario id(s): not-a-scenario');
+  });
+
   it('records scenario errors and excludes them from benchmark totals', async () => {
     const corpus = await loadScenarios();
     const attack = corpus.find((scenario) => scenario.id === 'a-email-authority')!;

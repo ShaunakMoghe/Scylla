@@ -9,7 +9,9 @@
     "typecheck": "tsc --noEmit",
     "bench": "tsx src/bench/cli.ts",
     "harden": "tsx src/harden/cli.ts",
-    "smoke:live": "tsx scripts/smoke-live.ts"
+    "smoke:live": "tsx scripts/smoke-live.ts",
+    "probe:red": "tsx scripts/probe-red-live.ts",
+    "probe:exposure": "tsx scripts/probe-exposure.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",
