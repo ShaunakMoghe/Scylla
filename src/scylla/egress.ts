@@ -1,7 +1,8 @@
-import type { EgressDecision, Finding, PolicyVersion, World } from '../shared/types.js';
+import type { EgressDecision, Finding, PolicyVersion, ProvenanceEntry, World } from '../shared/types.js';
 import type { JudgeInput, ModelProvider } from '../model/provider.js';
 import { scanDlp } from './dlp.js';
 import { matchingRules } from './policy.js';
+import { inspectProvenance } from './provenance.js';
 
 export async function inspectEgress(input: {
   task: string;
@@ -12,6 +13,7 @@ export async function inspectEgress(input: {
   provider: ModelProvider;
   policy: PolicyVersion;
   provenance?: { source: string; trust: string; findings: Finding[] }[];
+  provenanceLedger?: ProvenanceEntry[];
 }): Promise<EgressDecision> {
   if (input.mode === 'off') return { tool: input.tool, args: input.args, verdict: 'allow', findings: [], timings: [] };
   const findings: Finding[] = [];
@@ -27,6 +29,22 @@ export async function inspectEgress(input: {
   const policies = matchingRules(input.policy.rules, 'egress', serialized, input.tool, input.args);
   findings.push(...policies.map((rule) => ({ layer: 'policy' as const, ruleId: rule.id, severity: rule.kind === 'regex' ? rule.severity : 'high' as const, reason: rule.rationale })));
   timings.push({ layer: 'policy', ms: performance.now() - startPolicy });
+  const startProvenance = performance.now();
+  const provenance = inspectProvenance({
+    task: input.task,
+    tool: input.tool,
+    args: input.args,
+    world: input.world,
+    ledger: input.provenanceLedger ?? [],
+  });
+  timings.push({ layer: 'provenance', ms: performance.now() - startProvenance });
+  if (provenance.block || provenance.askHuman) {
+    findings.push({
+      layer: 'provenance',
+      severity: provenance.block ? 'high' : 'medium',
+      reason: provenance.reason ?? 'Control data provenance requires review.',
+    });
+  }
   const judgeInput: JudgeInput = {
     task: input.task,
     tool: input.tool,
@@ -43,9 +61,13 @@ export async function inspectEgress(input: {
   const judge = await input.provider.judge(judgeInput);
   timings.push({ layer: 'judge', ms: performance.now() - startJudge, model: input.provider.models.judge });
   if (judge.verdict !== 'allow') findings.push({ layer: 'judge', severity: judge.risk === 'high' ? 'high' : 'medium', reason: judge.reason, confidence: judge.risk === 'high' ? 0.95 : 0.7 });
-  let verdict: EgressDecision['verdict'] = policies.some((rule) => rule.kind === 'tool_policy' && rule.action === 'ask_human') || judge.verdict === 'ask_human'
-    ? 'ask_human'
-    : findings.length ? 'block' : 'allow';
+  let verdict: EgressDecision['verdict'] = provenance.block
+    ? 'block'
+    : provenance.askHuman
+      ? 'ask_human'
+      : policies.some((rule) => rule.kind === 'tool_policy' && rule.action === 'ask_human') || judge.verdict === 'ask_human'
+        ? 'ask_human'
+        : findings.length ? 'block' : 'allow';
   if (input.mode === 'shadow') verdict = findings.length ? 'block' : 'allow';
-  return { tool: input.tool, args: input.args, verdict, findings, timings, judge: { aligned: judge.aligned, risk: judge.risk, reason: judge.reason } };
+  return { tool: input.tool, args: input.args, verdict, findings, timings, provenance: provenance.args, judge: { aligned: judge.aligned, risk: judge.risk, reason: judge.reason } };
 }

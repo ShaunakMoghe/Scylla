@@ -158,7 +158,7 @@ export interface WorldPatch {
 export type IngressVerdict = 'allow' | 'sanitize' | 'quarantine';
 export type EgressVerdict = 'allow' | 'block' | 'ask_human';
 
-export type Layer = 'heuristic' | 'learned' | 'guard' | 'vision' | 'segment' | 'transcribe' | 'dlp' | 'judge' | 'policy';
+export type Layer = 'heuristic' | 'learned' | 'guard' | 'vision' | 'segment' | 'transcribe' | 'dlp' | 'judge' | 'policy' | 'provenance';
 
 export interface Finding {
   layer: Layer;
@@ -189,7 +189,30 @@ export interface EgressDecision {
   verdict: EgressVerdict;
   findings: Finding[];
   timings: LayerTiming[];
+  provenance?: ArgProvenance[];
   judge?: { aligned: boolean; risk: 'low' | 'medium' | 'high'; reason: string };
+}
+
+export interface ProvenanceEntry {
+  callId: string;
+  source: string;
+  trust: Trust;
+  text: string;
+  sender?: string;
+}
+
+export interface ArgProvenanceSource {
+  callId: string;
+  source: string;
+  quote: string;
+}
+
+export interface ArgProvenance {
+  arg: string;
+  value: string;
+  atom: string;
+  origin: 'task' | 'user' | 'sender' | 'internal' | 'untrusted' | 'unknown';
+  sources: ArgProvenanceSource[];
 }
 
 // ---------- Learned policy (blue team output; constrained DSL) ----------

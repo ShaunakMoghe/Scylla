@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Finding, PolicyVersion, RunResult, Scenario, ToolName, ScyllaEvent, World } from '../shared/types.js';
+import type { Finding, PolicyVersion, ProvenanceEntry, RunResult, Scenario, ToolName, ScyllaEvent, World } from '../shared/types.js';
 import type { EventSink, ModelProvider, RenderedLine, WorldToolResult } from '../model/provider.js';
 import { selectedProviderKind } from '../model/provider.js';
 import { MockProvider } from '../model/mock.js';
@@ -91,6 +91,7 @@ export async function runScenario(options: RunScenarioOptions): Promise<RunScena
     task: options.scenario.task, policyVersion: options.policy.version, provider: provider.kind,
   });
   const provenance: { source: string; trust: string; findings: Finding[] }[] = [];
+  const provenanceLedger: ProvenanceEntry[] = [];
   let blockedCalls = 0;
   let heldCalls = 0;
   let ingressFlags = 0;
@@ -122,6 +123,22 @@ export async function runScenario(options: RunScenarioOptions): Promise<RunScena
           mime: audioAsset.mime,
           hint: voicemail?.transcriptHint,
         } : undefined,
+      });
+      const email = toolName === 'read_email'
+        ? world.emails.find((item) => item.id === String(args.id ?? ''))
+        : undefined;
+      const ledgerText = [rawText];
+      if (result.attachment) {
+        ledgerText.push(...(result.attachment.lines ?? []).map((line) => line.text));
+        ledgerText.push(...inspection.decision.findings.filter((finding) => finding.layer === 'vision' && finding.quote).map((finding) => finding.quote!));
+      }
+      if (toolName === 'transcribe_voicemail' && inspection.content !== rawText) ledgerText.push(inspection.content);
+      provenanceLedger.push({
+        callId,
+        source,
+        trust: inspection.decision.trust,
+        text: ledgerText.join('\n'),
+        ...(email ? { sender: email.from } : {}),
       });
       if (inspection.decision.verdict !== 'allow') ingressFlags += 1;
       provenance.push({ source, trust: inspection.decision.trust, findings: inspection.decision.findings });
@@ -166,6 +183,7 @@ export async function runScenario(options: RunScenarioOptions): Promise<RunScena
       provider,
       policy: options.policy,
       provenance,
+      provenanceLedger,
     });
     let approvalId: string | undefined;
     let execute = options.mode === 'off' || options.mode === 'shadow' || decision.verdict === 'allow';
