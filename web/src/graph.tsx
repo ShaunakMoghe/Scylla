@@ -72,8 +72,8 @@ function srcLabel(c: CallInfo): string {
   return String(a.id ?? a.url ?? a.path ?? a.name ?? '');
 }
 
-const W = 860, NW = 150, NH = 38;
-const X = { src: 14, inWall: 228, agent: 355, outWall: 548, act: 590, dest: 760 };
+const W = 612, NW = 140, NH = 38, AW = 110;
+const X = { src: 6, inWall: 176, agent: 234, outWall: 372, act: 394, dest: 516 };
 
 export function LinkGraph({ events, mode, selected, onSelect }: { events: WardenEvent[]; mode?: WardenMode; selected?: string; onSelect: (callId?: string) => void }) {
   const calls = useMemo(() => collectCalls(events), [events]);
@@ -87,12 +87,12 @@ export function LinkGraph({ events, mode, selected, onSelect }: { events: Warden
   const done = events.some((e) => e.type === 'run.end');
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="xMidYMid meet" onClick={() => onSelect(undefined)}>
+    <svg viewBox={`0 0 ${W} ${H}`} className="block w-full h-auto max-h-full" preserveAspectRatio="xMidYMin meet" onClick={() => onSelect(undefined)}>
       <defs>
         <pattern id="dots" width="16" height="16" patternUnits="userSpaceOnUse"><circle cx="1" cy="1" r="0.8" fill="#26303d" /></pattern>
       </defs>
       <rect width={W} height={H} fill="url(#dots)" />
-      {['SOURCES · UNTRUSTED', 'AGENT', 'ACTIONS', 'DESTINATION'].map((t, i) => (
+      {['SOURCES', 'AGENT', 'ACTIONS', 'DESTINATION'].map((t, i) => (
         <text key={t} x={[X.src, X.agent - 20, X.act, X.dest][i]} y={18} className="label" fill="#56626f" style={{ fontSize: 9 }}>{t}</text>
       ))}
       {[X.inWall, X.outWall].map((x, i) => (
@@ -123,7 +123,7 @@ export function LinkGraph({ events, mode, selected, onSelect }: { events: Warden
             {!stopped && <line x1={X.outWall} y1={y} x2={X.act} y2={y} stroke={col} strokeWidth={1.6} />}
             {stopped && <WallMark x={X.outWall} y={y} tone={c.egress?.verdict === 'ask_human' ? 'caution' : 'hostile'} glyph={c.egress?.verdict === 'ask_human' ? 'Ⅱ' : '✕'} />}
             {c.effect && !c.effect.blocked && (
-              <line x1={X.act + NW - 40} y1={y} x2={X.dest} y2={y} stroke={col} strokeWidth={isLeak(c) ? 2.4 : 1.4} className={isLeak(c) ? 'flow' : ''} />
+              <line x1={X.act + AW} y1={y} x2={X.dest} y2={y} stroke={col} strokeWidth={isLeak(c) ? 2.4 : 1.4} className={isLeak(c) ? 'flow' : ''} />
             )}
           </g>
         );
@@ -138,7 +138,7 @@ export function LinkGraph({ events, mode, selected, onSelect }: { events: Warden
         const y = yAt(i, acts.length), tone = actionTone(c);
         return (
           <g key={c.callId}>
-            <Node x={X.act} y={y} w={NW - 40} tone={tone === 'clear' ? 'muted' : tone} glyph={toolGlyph(c.tool)} title={c.tool} sub={c.egress ? (c.egress.verdict === 'ask_human' ? 'held' : c.egress.verdict) : 'executed'}
+            <Node x={X.act} y={y} w={AW} tone={tone === 'clear' ? 'muted' : tone} glyph={toolGlyph(c.tool)} title={c.tool} sub={c.egress ? (c.egress.verdict === 'ask_human' ? 'held' : c.egress.verdict) : 'executed'}
               selected={selected === c.callId} onClick={() => onSelect(c.callId)} strike={tone === 'clear'} />
             {c.effect && !c.effect.blocked && (
               <g>

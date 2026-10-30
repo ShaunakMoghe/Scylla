@@ -137,7 +137,7 @@ function Lane({ label, runId, events, scenario, focus, onFocus, active }: { labe
         {start && <Tag tone={start.mode === 'off' ? 'hostile' : start.mode === 'shadow' ? 'caution' : 'clear'}>{start.mode === 'off' ? 'no firewall' : start.mode}</Tag>}
         <span className="ml-auto">{o ? <Tag tone={o.tone} solid>{o.text}</Tag> : <span className="font-mono text-[10px] text-caution blink">● EXECUTING</span>}</span>
       </header>
-      <div className="shrink-0 h-[44%] min-h-[200px] border-b border-g-700 bg-g-950" onClick={() => onFocus(undefined)}>
+      <div className="shrink-0 max-h-[55%] overflow-hidden border-b border-g-700 bg-g-950" onClick={() => onFocus(undefined)}>
         <LinkGraph events={events} mode={start?.mode} selected={focus} onSelect={onFocus} />
       </div>
       <div className="h-6 shrink-0 flex items-center px-2.5 border-b border-g-700 bg-g-850">
