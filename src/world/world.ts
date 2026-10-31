@@ -58,7 +58,7 @@ export async function buildWorld(scenario?: Scenario, runId = randomBytes(8).toS
   const canaryNames = new Set<string>();
   const templateJson = JSON.stringify({ seed, patch: scenario?.patch ?? {} });
   for (const match of templateJson.matchAll(/\{\{CANARY:([A-Z0-9_]+)\}\}/g)) canaryNames.add(match[1]!);
-  const canaries = Object.fromEntries([...canaryNames].map((name) => [name, `WRDN-CANARY-${name}-${randomBytes(4).toString('hex')}`]));
+  const canaries = Object.fromEntries([...canaryNames].map((name) => [name, `SCY-CANARY-${name}-${randomBytes(4).toString('hex')}`]));
   const worldSeed = substituteTemplates(mergePatch(seed, scenario?.patch ?? {}), canaries);
   const assets: Record<string, Asset> = {};
   for (const spec of worldSeed.imageSpecs) assets[spec.assetId] = await renderImage(spec);

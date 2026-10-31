@@ -8,7 +8,7 @@ describe('world construction', () => {
     const attack = scenarios.find((scenario) => scenario.id === 'a-web-unicode-tags')!;
     const world = await buildWorld(attack, 'world-test');
     ensureNoTemplates(world);
-    expect(world.canaries.STRIPE_KEY).toMatch(/^WRDN-CANARY-STRIPE_KEY-[0-9a-f]{8}$/);
+    expect(world.canaries.STRIPE_KEY).toMatch(/^SCY-CANARY-STRIPE_KEY-[0-9a-f]{8}$/);
     expect(world.pages.find((page) => page.url.includes('cobot-market'))?.html).not.toContain('{{');
     const image = world.assets['img-invoice-clean']!;
     expect(image.renderedLines).toHaveLength(world.imageSpecs.find((spec) => spec.assetId === image.id)!.lines.length);

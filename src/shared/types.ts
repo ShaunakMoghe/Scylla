@@ -85,7 +85,7 @@ export interface ImageSpec {
 /** Runtime world: seed + scenario patch, with canary values substituted. */
 export interface World extends WorldSeed {
   assets: Record<string, Asset>;
-  canaries: Record<string, string>; // name -> value, e.g. STRIPE_KEY -> "WRDN-CANARY-…"
+  canaries: Record<string, string>; // name -> value, e.g. STRIPE_KEY -> "SCY-CANARY-…"
   outbox: SideEffect[];
 }
 

@@ -3,7 +3,7 @@ import type { ScyllaEvent, IngressDecision, EgressDecision, SideEffect, ScyllaMo
 import { Glyph, toolGlyph, toneHex, short, type Tone } from './ui';
 
 const READS = new Set(['list_emails', 'read_email', 'read_attachment', 'http_get', 'read_file', 'list_files', 'list_voicemails', 'transcribe_voicemail']);
-const CANARY = /WRDN-CANARY-[A-Z_]+-[0-9a-f]{8}/;
+const CANARY = /(?:WRDN|SCY)-CANARY-[A-Z_]+-[0-9a-f]{8}/;
 
 export interface CallInfo {
   callId: string;

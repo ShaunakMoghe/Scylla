@@ -6,8 +6,10 @@ describe('DLP and destination analysis', () => {
   it('detects canaries in supported encodings and whitespace-separated forms', async () => {
     const world = await buildWorld(undefined, 'dlp-test');
     const value = world.canaries.STRIPE_KEY!;
+    const legacyValue = value.replace(/^SCY-CANARY-/, 'WRDN-CANARY-');
     const encodings = [
       value,
+      legacyValue,
       Buffer.from(value).toString('base64'),
       encodeURIComponent(value),
       Buffer.from(value).toString('hex'),
