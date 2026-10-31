@@ -58,7 +58,7 @@ export async function splitVisionTiles(
         .extract({ left, top, width: cropWidth, height: cropHeight })
         .normalise();
       if (enhance) {
-        tile.greyscale().clahe({ width: 64, height: 64, maxSlope: 3 }).linear(1.6, -60);
+        tile.greyscale().clahe({ width: 64, height: 64, maxSlope: 3 }).linear(1.6, -60).toColourspace('srgb');
       }
       const tileImage = await tile
         .resize(resizedWidth, resizedHeight, { fit: 'fill' })
