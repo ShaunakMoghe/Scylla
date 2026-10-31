@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { pilot } from '../pilot';
 import type { ScyllaEvent, Scenario, ScyllaMode, RunResult, Finding, EgressDecision } from '../../../src/shared/types';
 import { getJSON, postJSON, type useScylla } from '../api';
 import { LinkGraph, collectCalls, isLeak, type CallInfo } from '../graph';
@@ -18,10 +19,10 @@ export function Intercept({ store, run, waitEnd }: Props) {
   useEffect(() => { getJSON<Scenario[]>('/api/scenarios').then((s) => s && setScenarios(s)); }, [store.policy?.version]);
   const scenario = scenarios.find((s) => s.id === sel);
 
-  const go = async (modes: ScyllaMode[]) => {
+  const go = async (modes: ScyllaMode[], scenarioId = sel) => {
     setBusy(true); setPair({}); setFocus(null);
     for (const m of modes) {
-      const id = await run(sel, m);
+      const id = await run(scenarioId, m);
       if (!id) continue;
       setPair((p) => (m === 'off' ? { ...p, off: id } : { ...p, on: id }));
       setFocus({ runId: id });
@@ -29,6 +30,8 @@ export function Intercept({ store, run, waitEnd }: Props) {
     }
     setBusy(false);
   };
+
+  useEffect(() => pilot.on('intercept.compare', async (id) => { setSel(id); await go(['off', 'enforce'], id); }), []);
 
   const lanes = [pair.off && { id: pair.off, label: 'Unprotected' }, pair.on && { id: pair.on, label: 'Behind Scylla' }].filter(Boolean) as { id: string; label: string }[];
 
@@ -338,11 +341,11 @@ function Timings({ t }: { t: { layer: string; ms: number; model?: string }[] }) 
   );
 }
 
-const ORIGIN_TONE: Record<string, Tone> = { task: 'clear', user: 'clear', sender: 'friendly', internal: 'friendly', untrusted: 'hostile', unknown: 'caution' };
-function Provenance({ p }: { p: NonNullable<EgressDecision['provenance']> }) {
+export const ORIGIN_TONE: Record<string, Tone> = { task: 'clear', user: 'clear', sender: 'friendly', internal: 'friendly', untrusted: 'hostile', unknown: 'caution' };
+export function Provenance({ p }: { p: NonNullable<EgressDecision['provenance']> }) {
   return (
-    <div className="bg-black border border-intel/40 p-2 mb-1.5">
-      <div className="font-mono text-[9.5px] text-intel mb-1">ARGUMENT PROVENANCE · WHO CHOSE EACH CONTROL VALUE</div>
+    <div className="bg-white/[.02] border border-intel/30 rounded-md p-2.5 mb-1.5">
+      <div className="text-[11px] text-intel mb-1">Argument provenance · who chose each control value</div>
       {p.map((a, i) => (
         <div key={i} className="py-1 border-t border-white/[.04] first:border-t-0">
           <div className="flex items-center gap-2 font-mono text-[10.5px]">

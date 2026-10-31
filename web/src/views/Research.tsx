@@ -3,6 +3,11 @@ import type { ScyllaEvent, SearchNode } from '../../../src/shared/types';
 import type { Store } from '../api';
 import { getJSON, postJSON } from '../api';
 import { Panel, Tag, Btn, Kpi, KV, short, pct, type Tone, toneHex } from '../ui';
+import { Provenance } from './Intercept';
+import { pilot } from '../pilot';
+import type { ArgProvenance } from '../../../src/shared/types';
+
+interface ReplayResult { searchId: string; nodeId: string; scenarioId: string; task: string; modelCalls: number; calls: { tool: string; args: string; verdict: 'allow' | 'block' | 'ask_human'; reason?: string; provenance: ArgProvenance[] }[] }
 
 interface SearchReport {
   id: string; createdAt: number; target: 'off' | 'enforce'; profile: string; provider: string;
@@ -23,6 +28,7 @@ export function Research({ store }: { store: Store }) {
   const [node, setNode] = useState<string>('');
   const [abl, setAbl] = useState<Ablation | null>(null);
   const [busy, setBusy] = useState(false);
+  useEffect(() => pilot.on('research.select', (v) => { const [s, n] = v.split('/'); setSel(s ?? ''); setNode(n ?? ''); }), []);
   const refresh = () => getJSON<SearchReport[]>('/api/searches').then((r) => r && setReports(r));
   useEffect(() => { refresh(); getJSON<Ablation>('/api/ablation/latest').then(setAbl); const t = setInterval(refresh, 8000); return () => clearInterval(t); }, []);
 
@@ -77,7 +83,7 @@ export function Research({ store }: { store: Store }) {
           {current?.nodes.length ? <Tree nodes={current.nodes} sel={picked?.id} onSel={setNode} /> : <div className="p-4 font-mono text-[11px] text-g-500">No search yet. Launch one above or run <span className="text-g-300">npm run search</span>.</div>}
         </Panel>
         <Panel title="Variant dossier" className="row-span-2" right={picked ? <Tag tone={LEVEL[picked.level]!.tone}>{LEVEL[picked.level]!.label}</Tag> : null} bodyClass="overflow-y-auto p-3 space-y-3">
-          {picked ? <Dossier n={picked} /> : <div className="font-mono text-[11px] text-g-500">Select a node.</div>}
+          {picked ? <Dossier n={picked} searchId={current && reports.some((r) => r.id === current.id) ? current.id : undefined} /> : <div className="font-mono text-[11px] text-g-500">Select a node.</div>}
         </Panel>
         <Panel title="Layer ablation · which layer alone catches which attack" right={abl ? <span className="font-mono text-[10px] text-g-400">mock · deterministic · {new Date(abl.createdAt).toISOString().slice(0, 16).replace('T', ' ')}Z</span> : null} bodyClass="overflow-auto">
           {abl ? <AblationGrid a={abl} /> : <div className="p-4 font-mono text-[11px] text-g-500">Run <span className="text-g-300">npm run ablation</span>.</div>}
@@ -144,8 +150,46 @@ function Tree({ nodes, sel, onSel }: { nodes: SearchNode[]; sel?: string; onSel:
   );
 }
 
-function Dossier({ n }: { n: SearchNode }) {
+const SIDE = /^(send_email|http_post|pay_invoice|delete_file|create_calendar_event)$/;
+const VERDICT: Record<string, { label: string; tone: Tone }> = { allow: { label: 'Allowed', tone: 'hostile' }, block: { label: 'Blocked', tone: 'clear' }, ask_human: { label: 'Held for human approval', tone: 'clear' } };
+
+function ReplayPanel({ searchId, n }: { searchId: string; n: SearchNode }) {
+  const [r, setR] = useState<ReplayResult | null>(null);
+  const [state, setState] = useState<'idle' | 'running' | 'error'>('idle');
+  useEffect(() => { setR(null); setState('idle'); }, [searchId, n.id]);
+  useEffect(() => pilot.on('research.replay', () => go()), [searchId, n.id]);
+  const go = async () => {
+    setState('running');
+    const [res] = await Promise.all([postJSON<ReplayResult>(`/api/replay/${searchId}/${n.id}`, {}), new Promise((ok) => setTimeout(ok, 650))]);
+    setR(res); setState(res ? 'idle' : 'error');
+  };
+  return (
+    <div id="scylla-replay" className="rounded-md border border-g-600 bg-white/[.02] p-2.5">
+      <div className="flex items-center gap-2">
+        <div>
+          <div className="text-[12px] text-g-100 font-medium">Replay the recorded action through Scylla</div>
+          <div className="text-[11px] text-g-400">Exact tool call from this live run · deterministic egress check · no model calls · sandbox only</div>
+        </div>
+        <div className="ml-auto shrink-0"><Btn primary disabled={state === 'running'} onClick={go}>{state === 'running' ? 'Replaying…' : r ? 'Replay again' : 'Replay'}</Btn></div>
+      </div>
+      {state === 'error' && <div className="mt-2 text-[11px] text-hostile">Replay failed: report not available on this server.</div>}
+      {r && r.calls.map((c, i) => (
+        <div key={i} className="mt-2.5">
+          <div className="flex items-center gap-2 font-mono text-[10.5px] mb-1.5"><span className="text-hostile">{c.tool}</span><span className="text-g-400 truncate">{c.args}</span></div>
+          <Provenance p={c.provenance} />
+          <div className="flex items-center gap-2 mt-1.5">
+            <Tag tone={VERDICT[c.verdict]!.tone}>{VERDICT[c.verdict]!.label}</Tag>
+            <span className="text-[11px] text-g-300">{c.reason ?? 'No untrusted control values'}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function Dossier({ n, searchId }: { n: SearchNode; searchId?: string }) {
   return <>
+    {searchId && n.success && n.toolCalls.some((c) => SIDE.test(c.tool)) && <ReplayPanel searchId={searchId} n={n} />}
     <div className="grid grid-cols-2 gap-x-3 gap-y-1">
       <KV k="seed" v={n.seedId} /><KV k="depth" v={String(n.depth)} />
       <KV k="node" v={n.id.replace(`${n.seedId}-`, '')} /><KV k="calls at node" v={String(n.calls)} />
