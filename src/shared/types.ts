@@ -313,6 +313,20 @@ export interface SearchNode {
   calls: number;
 }
 
+export interface SearchReport {
+  id: string;
+  createdAt: number;
+  target: 'off' | 'enforce';
+  profile: 'standard' | 'compliant';
+  provider: 'live' | 'mock';
+  budget: number;
+  callsUsed: number;
+  seeds: string[];
+  nodes: SearchNode[];
+  found: Scenario[];
+  aborted?: string;
+}
+
 // ---------- Event stream (WS /ws, also stored in RunResult.trace) ----------
 
 interface Base { runId: string; ts: number }

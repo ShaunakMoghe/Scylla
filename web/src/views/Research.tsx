@@ -11,7 +11,7 @@ interface ReplayResult { searchId: string; nodeId: string; scenarioId: string; t
 
 interface SearchReport {
   id: string; createdAt: number; target: 'off' | 'enforce'; profile: string; provider: string;
-  budget: number; callsUsed: number; seeds: string[]; nodes: SearchNode[]; found: { id: string }[];
+  budget: number; callsUsed: number; seeds: string[]; nodes: SearchNode[]; found: { id: string }[]; aborted?: string;
 }
 interface Ablation { id: string; createdAt: number; configs: { name: string; layers: string[]; caught: Record<string, boolean>; asr: number; utility: number }[] }
 
@@ -78,6 +78,11 @@ export function Research({ store }: { store: Store }) {
         <Kpi label="bypasses found" value={current ? String(current.nodes.filter((n) => n.success).length) : '—'} tone={current?.nodes.some((n) => n.success) ? 'hostile' : 'clear'} />
         <Kpi label="model calls" value={current ? `${current.callsUsed}${current.budget ? `/${current.budget}` : ''}` : '—'} tone="muted" sub="hard-capped budget" />
       </div>
+      {current?.aborted && <div className="shrink-0 bg-black border-b border-g-750 px-5 py-1.5">
+        <span className="inline-flex items-center h-[18px] px-1.5 rounded-[3px] bg-white/[.05] font-mono text-[10px] tracking-[.04em] text-g-400 break-all">
+          stopped early: {current.aborted}
+        </span>
+      </div>}
       <div className="flex-1 min-h-0 grid grid-cols-[minmax(0,1fr)_380px] grid-rows-[minmax(0,1fr)_minmax(0,46%)] gap-px bg-g-700">
         <Panel title="Attack tree · depth → refinement" right={<Legend />} bodyClass="overflow-auto bg-black">
           {current?.nodes.length ? <Tree nodes={current.nodes} sel={picked?.id} onSel={setNode} /> : <div className="p-4 font-mono text-[11px] text-g-500">No search yet. Launch one above or run <span className="text-g-300">npm run search</span>.</div>}

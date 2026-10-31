@@ -1,13 +1,15 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { ModelProvider } from '../model/provider.js';
 import { loadScenarios, runScenario } from '../bench/run.js';
 import { loadPolicyVersion } from '../bench/suite.js';
 import { isDomainSafeScenario, validateScenarioContent } from '../harden/red.js';
-import type { Scenario, ScyllaEvent, SearchNode, SearchReplacement, SearchToolCall } from '../shared/types.js';
+import type { Scenario, ScyllaEvent, SearchNode, SearchReplacement, SearchToolCall, SearchReport as SharedSearchReport } from '../shared/types.js';
 import { carrierTouched } from './exposure.js';
 import { encodeTags } from '../world/world.js';
+
+export type SearchReport = SharedSearchReport;
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const promptPath = resolve(root, 'prompts/search.md');
@@ -42,19 +44,6 @@ export const SearchSchema = {
     },
   },
 };
-
-export interface SearchReport {
-  id: string;
-  createdAt: number;
-  target: 'off' | 'enforce';
-  profile: 'standard' | 'compliant';
-  provider: 'live' | 'mock';
-  budget: number;
-  callsUsed: number;
-  seeds: string[];
-  nodes: SearchNode[];
-  found: Scenario[];
-}
 
 type SearchSink = (event: ScyllaEvent) => void | Promise<void>;
 type CarrierField = { field: string; text: string; set: (value: string) => void };
@@ -294,23 +283,60 @@ export async function runAdaptiveSearch(input: {
   const found: Scenario[] = [];
   let sequence = 0;
   let budgetReached = false;
+  let aborted: string | undefined;
   const callsUsed = () => input.provider.calls() - startingCalls;
+  const nodeCallEstimate = () => Math.max(0, ...nodes.map((node) => node.calls));
+  const budgetExhausted = () => callsUsed() >= budget || callsUsed() + nodeCallEstimate() > budget;
+  const reportDirectory = input.reportDirectory ?? resolve(root, 'runs/search');
+  const reportPath = resolve(reportDirectory, `${searchId}.json`);
+  await mkdir(reportDirectory, { recursive: true });
+  const currentReport = (): SearchReport => ({
+    id: searchId,
+    createdAt,
+    target,
+    profile,
+    provider: input.provider.kind,
+    budget,
+    callsUsed: callsUsed(),
+    seeds: seeds.map((seed) => seed.id),
+    nodes,
+    found,
+    ...(aborted === undefined ? {} : { aborted }),
+  });
+  const persistReport = async (): Promise<SearchReport> => {
+    const report = currentReport();
+    const temporaryPath = `${reportPath}.${process.pid}.tmp`;
+    await writeFile(temporaryPath, `${JSON.stringify(report, null, 2)}\n`);
+    await rename(temporaryPath, reportPath);
+    return report;
+  };
+  const errorMessage = (error: unknown) => error instanceof Error ? error.message : String(error);
   const emit = async (node: SearchNode) => {
     console.error(`[search] ${node.seedId} depth=${node.depth} level=${node.level} calls=${node.calls}`);
     await input.sink?.({ type: 'search.node', searchId, runId: searchId, ts: Date.now(), node });
   };
 
-  for (const seed of seeds) {
-    if (budgetReached || callsUsed() >= budget) break;
+  searchLoop: for (const seed of seeds) {
+    if (budgetReached || budgetExhausted()) {
+      budgetReached = true;
+      break;
+    }
     const rootCalls = input.provider.calls();
-    const rootResult = await runScenario({
-      scenario: seed,
-      mode: target,
-      policy,
-      provider: input.provider,
-      profile,
-      benchmark: true,
-    });
+    let rootResult: Awaited<ReturnType<typeof runScenario>>;
+    try {
+      rootResult = await runScenario({
+        scenario: seed,
+        mode: target,
+        policy,
+        provider: input.provider,
+        profile,
+        benchmark: true,
+      });
+    } catch (error) {
+      aborted = errorMessage(error);
+      console.error(`[search] aborted seed=${seed.id} depth=0 stage=node reason=${aborted}`);
+      break searchLoop;
+    }
     const rootNode = makeNode({
       id: `${seed.id}-n${sequence++}`,
       parentId: null,
@@ -326,8 +352,13 @@ export async function runAdaptiveSearch(input: {
       target,
     });
     nodes.push(rootNode);
+    await persistReport();
     await emit(rootNode);
-    if (rootNode.success || callsUsed() >= budget) continue;
+    if (rootNode.success) continue;
+    if (budgetExhausted()) {
+      budgetReached = true;
+      continue;
+    }
 
     let frontier = [{ node: rootNode, scenario: seed, sequence: sequence - 1 }];
     let seedSucceeded = false;
@@ -335,7 +366,7 @@ export async function runAdaptiveSearch(input: {
       const parents = [...frontier].sort((left, right) => right.node.level - left.node.level || right.sequence - left.sequence).slice(0, width);
       const next: typeof frontier = [];
       for (const parent of parents) {
-        if (callsUsed() >= budget) { budgetReached = true; break; }
+        if (budgetExhausted()) { budgetReached = true; break; }
         const fields = carrierFields(parent.scenario).map(({ field, text }) => ({ field, text }));
         if (!fields.length) {
           console.error(`[search] no mutable carrier fields seed=${seed.id} parent=${parent.node.id} depth=${currentDepth + 1}`);
@@ -353,9 +384,9 @@ export async function runAdaptiveSearch(input: {
         try {
           raw = await input.provider.structured('red', system, user, SearchSchema);
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          console.error(`[search] attacker error seed=${seed.id} parent=${parent.node.id} depth=${currentDepth + 1}: ${message}`);
-          throw error;
+          aborted = errorMessage(error);
+          console.error(`[search] aborted seed=${seed.id} parent=${parent.node.id} depth=${currentDepth + 1} stage=attacker reason=${aborted}`);
+          break searchLoop;
         }
         const parsed = parseVariants(raw);
         for (const dropped of parsed.dropped) {
@@ -367,9 +398,9 @@ export async function runAdaptiveSearch(input: {
           console.error(`[search] attacker returned no variants seed=${seed.id} parent=${parent.node.id} depth=${currentDepth + 1}`);
         }
         console.error(`[search] attacker response seed=${seed.id} parent=${parent.node.id} depth=${currentDepth + 1} accepted=${parsed.variants.length} dropped=${parsed.dropped.length} calls=${callsUsed()}`);
-        if (callsUsed() >= budget) {
+        if (budgetExhausted()) {
           for (const candidate of parsed.variants) {
-            console.error(`[search] dropped variant seed=${seed.id} parent=${parent.node.id} depth=${currentDepth + 1} index=${candidate.index} reason=search budget exhausted after attacker call`);
+            console.error(`[search] dropped variant seed=${seed.id} parent=${parent.node.id} depth=${currentDepth + 1} index=${candidate.index} reason=insufficient budget headroom after attacker call`);
           }
           budgetReached = true;
           break;
@@ -388,15 +419,29 @@ export async function runAdaptiveSearch(input: {
           if (prepared.preservedTriggerField) {
             console.error(`[search] preserved fixture trigger seed=${seed.id} parent=${parent.node.id} depth=${currentDepth + 1} index=${index} field=${prepared.preservedTriggerField}`);
           }
+          if (budgetExhausted()) {
+            for (const dropped of parsed.variants.slice(variantIndex)) {
+              console.error(`[search] dropped variant seed=${seed.id} parent=${parent.node.id} depth=${currentDepth + 1} index=${dropped.index} reason=insufficient budget headroom before node evaluation`);
+            }
+            budgetReached = true;
+            break;
+          }
           const beforeRun = input.provider.calls();
-          const result = await runScenario({
-            scenario: prepared.scenario,
-            mode: target,
-            policy,
-            provider: input.provider,
-            profile,
-            benchmark: true,
-          });
+          let result: Awaited<ReturnType<typeof runScenario>>;
+          try {
+            result = await runScenario({
+              scenario: prepared.scenario,
+              mode: target,
+              policy,
+              provider: input.provider,
+              profile,
+              benchmark: true,
+            });
+          } catch (error) {
+            aborted = errorMessage(error);
+            console.error(`[search] aborted seed=${seed.id} parent=${parent.node.id} depth=${currentDepth + 1} stage=node reason=${aborted}`);
+            break searchLoop;
+          }
           const node = makeNode({
             id: `${seed.id}-n${sequence++}`,
             parentId: parent.node.id,
@@ -412,15 +457,16 @@ export async function runAdaptiveSearch(input: {
             target,
           });
           nodes.push(node);
-          await emit(node);
           next.push({ node, scenario: prepared.scenario, sequence: sequence - 1 });
           if (node.success) {
             const successful = { ...prepared.scenario, id: `${seed.id}-s1`, origin: 'redteam' as const };
             found.push(successful);
             seedSucceeded = true;
-            break;
           }
-          if (callsUsed() >= budget) { budgetReached = true; break; }
+          await persistReport();
+          await emit(node);
+          if (node.success) break;
+          if (budgetExhausted()) { budgetReached = true; break; }
         }
         if (seedSucceeded || budgetReached) break;
       }
@@ -428,21 +474,7 @@ export async function runAdaptiveSearch(input: {
     }
   }
 
-  const report: SearchReport = {
-    id: searchId,
-    createdAt,
-    target,
-    profile,
-    provider: input.provider.kind,
-    budget,
-    callsUsed: callsUsed(),
-    seeds: seeds.map((seed) => seed.id),
-    nodes,
-    found,
-  };
-  const reportDirectory = input.reportDirectory ?? resolve(root, 'runs/search');
-  await mkdir(reportDirectory, { recursive: true });
-  await writeFile(resolve(reportDirectory, `${searchId}.json`), `${JSON.stringify(report, null, 2)}\n`);
+  const report = await persistReport();
   await input.sink?.({ type: 'search.end', searchId, runId: searchId, ts: Date.now(), reportId: searchId });
   return report;
 }
