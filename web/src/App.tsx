@@ -23,6 +23,7 @@ const SCRIPT: Step[] = [
   { view: 'analytics', caption: 'Across 28 scenarios on the deliberately gullible mock agent: 18/18 attacks land unprotected, 0/18 behind Scylla, 10/10 benign tasks still complete.', dwell: 8000 },
   { view: 'research', caption: 'Live on Muse Spark: an adaptive attacker rewrote the invoice until the unprotected agent paid an attacker-controlled account.', act: () => pilot.emit('research.select', DEMO_SEARCH), dwell: 8500 },
   { view: 'research', caption: 'Replaying that exact payment through Scylla: the account and SWIFT code trace back to the untrusted attachment, so the payment is held for a human. No model calls.', act: () => pilot.emit('research.replay'), dwell: 10000 },
+  { view: 'research', caption: 'Then we aimed the attacker at Scylla itself. One variant slipped past ingress and the agent tried to pay the attacker again. Scylla stopped the payment live at egress: the bank details came from the untrusted image.', act: () => pilot.emit('research.select', 'search-1793425274127/a-payment-redirect-n7'), dwell: 10000 },
   { view: 'research', caption: 'Scylla: a self-hardening firewall for AI agents.', dwell: 4000 },
 ];
 
