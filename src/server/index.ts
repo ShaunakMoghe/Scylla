@@ -1,6 +1,7 @@
 import cors from 'cors';
 import express from 'express';
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
@@ -14,10 +15,14 @@ import { loadScenarios, runScenario } from '../bench/run.js';
 import { runSuite, loadPolicyVersion } from '../bench/suite.js';
 import { runHardening } from '../harden/loop.js';
 import { runAdaptiveSearch } from '../research/search.js';
+import type { SearchReport } from '../research/search.js';
+import { loadSearchReport } from '../research/replay.js';
 import { EventBus } from './bus.js';
+import { registerReplayRoute } from './replay-route.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const port = Number(process.env.PORT ?? 4100);
+const publicDemo = process.env.SCYLLA_PUBLIC_DEMO === '1';
 const app = express();
 const server = createServer(app);
 const ws = new WebSocketServer({ server, path: '/ws' });
@@ -29,6 +34,16 @@ let busy = false;
 
 app.use(cors());
 app.use(express.json({ limit: '8mb' }));
+
+async function readSearchReports(directory: string): Promise<SearchReport[]> {
+  try {
+    const names = (await readdir(directory)).filter((name) => /^search-\d+\.json$/.test(name));
+    return await Promise.all(names.map(async (name) => JSON.parse(await readFile(resolve(directory, name), 'utf8')) as SearchReport));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw error;
+  }
+}
 
 const publish = async (event: ScyllaEvent) => {
   bus.publish(event);
@@ -149,6 +164,7 @@ app.post('/api/approval/:id', (req, res) => {
 
 app.post('/api/bench', async (req, res) => {
   const { mode = 'enforce', provider: requestedProvider, profile } = req.body as { mode?: ScyllaMode; provider?: 'mock' | 'live'; profile?: 'standard' | 'compliant' };
+  if (publicDemo && requestedProvider === 'live') return res.status(403).json({ error: 'Live provider is disabled in public demo mode' });
   if (busy) return res.status(409).json({ error: 'A run is already in progress' });
   if (!['off', 'shadow', 'enforce'].includes(mode)) return res.status(400).json({ error: 'Invalid mode' });
   if (requestedProvider && !['mock', 'live'].includes(requestedProvider)) return res.status(400).json({ error: 'Invalid provider' });
@@ -173,6 +189,10 @@ app.post('/api/harden', (req, res) => {
   const rounds = body.rounds ?? 3;
   const perRound = body.perRound ?? 4;
   const requestedProvider = body.provider;
+  if (publicDemo && requestedProvider === 'live') return res.status(403).json({ error: 'Live provider is disabled in public demo mode' });
+  if (publicDemo && (rounds > 3 || perRound > 4)) {
+    return res.status(400).json({ error: 'Public demo allows at most 3 rounds and 4 cases per round' });
+  }
   if (busy) return res.status(409).json({ error: 'A run is already in progress' });
   if (!Number.isSafeInteger(rounds) || rounds < 0 || rounds > 10 || !Number.isSafeInteger(perRound) || perRound < 1 || perRound > 12) {
     return res.status(400).json({ error: 'rounds must be 0..10 and perRound must be 1..12' });
@@ -216,6 +236,7 @@ app.post('/api/search', (req, res) => {
   const width = body.width ?? 2;
   const budget = body.budget ?? 150;
   const profile = body.profile ?? 'standard';
+  if (publicDemo && budget > 150) return res.status(400).json({ error: 'Public demo allows a search budget of at most 150 model calls' });
   if (busy) return res.status(409).json({ error: 'A run is already in progress' });
   if (body.seeds !== undefined && (!Array.isArray(body.seeds) || body.seeds.some((seed) => typeof seed !== 'string'))) {
     return res.status(400).json({ error: 'seeds must be an array of scenario ids' });
@@ -255,24 +276,29 @@ app.post('/api/search', (req, res) => {
 
 app.get('/api/searches', async (_req, res) => {
   try {
-    const searchDir = resolve(root, 'runs/search');
-    const names = (await readdir(searchDir)).filter((name) => /^search-\d+\.json$/.test(name));
-    const reports = await Promise.all(names.map(async (name) => JSON.parse(await readFile(resolve(searchDir, name), 'utf8'))));
+    const reportsById = new Map<string, SearchReport>();
+    const evidenceReports = await readSearchReports(resolve(root, 'docs/evidence'));
+    const runReports = await readSearchReports(resolve(root, 'runs/search'));
+    for (const report of [...evidenceReports, ...runReports]) reportsById.set(report.id, report);
+    const reports = [...reportsById.values()];
     reports.sort((left, right) => right.createdAt - left.createdAt);
     res.json(reports);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return res.json([]);
     res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
   }
 });
 app.get('/api/search/:id', async (req, res) => {
   try {
     if (!/^search-\d+$/.test(req.params.id)) return res.status(404).json({ error: 'Search report not found' });
-    res.json(JSON.parse(await readFile(resolve(root, 'runs/search', `${req.params.id}.json`), 'utf8')));
+    const report = await loadSearchReport(root, req.params.id);
+    if (!report) return res.status(404).json({ error: 'Search report not found' });
+    res.json(report);
   } catch {
     res.status(404).json({ error: 'Search report not found' });
   }
 });
+
+registerReplayRoute(app, root);
 
 ws.on('connection', (socket) => {
   for (const event of bus.replay()) if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(event));
@@ -281,6 +307,17 @@ ws.on('connection', (socket) => {
   });
   socket.on('close', unsubscribe);
 });
+
+const webDist = resolve(root, 'web/dist');
+if (process.env.SCYLLA_SERVE_STATIC === '1' && existsSync(webDist)) {
+  app.use(express.static(webDist));
+  app.get('*', (req, res, next) => {
+    if (req.path === '/ws' || req.path === '/api' || req.path.startsWith('/api/')) return next();
+    res.sendFile(resolve(webDist, 'index.html'), (error) => {
+      if (error) next(error);
+    });
+  });
+}
 
 server.listen(port, () => {
   console.log(`Scylla server listening on http://localhost:${port}`);

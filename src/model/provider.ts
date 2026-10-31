@@ -95,6 +95,7 @@ export interface ModelProvider {
 }
 
 export function selectedProviderKind(): 'mock' | 'live' {
+  if (process.env.SCYLLA_PUBLIC_DEMO === '1') return 'mock';
   const requested = process.env.SCYLLA_PROVIDER;
   if (requested === 'mock' || requested === 'live') return requested;
   return process.env.MODEL_API_KEY ? 'live' : 'mock';
