@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import sharp from 'sharp';
 import { loadPolicyVersion } from '../src/bench/suite.js';
 import { loadScenarios } from '../src/bench/run.js';
 import { MockProvider } from '../src/model/mock.js';
 import type { Box } from '../src/shared/types.js';
 import { inspectIngress } from '../src/scylla/ingress.js';
+import { splitVisionTiles } from '../src/scylla/tiles.js';
 import { buildWorld } from '../src/world/world.js';
 import type { VisionVerdict } from '../src/model/provider.js';
 
@@ -29,6 +31,42 @@ class TileOnlyProvider extends MockProvider {
 }
 
 describe('tiled vision scanning', () => {
+  it('enhances low-contrast tiles into 3x PNGs with higher contrast', async () => {
+    const width = 320;
+    const height = 240;
+    const pixels = Buffer.alloc(width * height);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        pixels[y * width + x] = 126 + ((Math.floor(x / 8) + Math.floor(y / 8)) % 2) * 4;
+      }
+    }
+    const image = await sharp(pixels, { raw: { width, height, channels: 1 } }).png().toBuffer();
+    const sourceStats = await sharp(image).stats();
+    const previousEnhancement = process.env.SCYLLA_VISION_ENHANCE;
+    try {
+      delete process.env.SCYLLA_VISION_ENHANCE;
+      const tile = (await splitVisionTiles(image))[0]!;
+      const metadata = await sharp(tile.image).metadata();
+      const enhancedStats = await sharp(tile.image).stats();
+
+      expect(metadata.format).toBe('png');
+      expect(metadata.width).toBe(540);
+      expect(metadata.height).toBe(405);
+      expect(enhancedStats.channels[0]!.stdev).toBeGreaterThan(sourceStats.channels[0]!.stdev);
+
+      process.env.SCYLLA_VISION_ENHANCE = '0';
+      const disabledTile = (await splitVisionTiles(image))[0]!;
+      const explicitlyDisabledTile = (await splitVisionTiles(image, [], { enhance: false }))[0]!;
+      expect(disabledTile.image).toEqual(explicitlyDisabledTile.image);
+      console.info(
+        `vision tile contrast: source σ=${sourceStats.channels[0]!.stdev.toFixed(2)}, enhanced σ=${enhancedStats.channels[0]!.stdev.toFixed(2)}`,
+      );
+    } finally {
+      if (previousEnhancement === undefined) delete process.env.SCYLLA_VISION_ENHANCE;
+      else process.env.SCYLLA_VISION_ENHANCE = previousEnhancement;
+    }
+  });
+
   it('finds a tile-only injection and returns a full-image-coordinate fallback box', async () => {
     const scenario = (await loadScenarios()).find((item) => item.id === 'a-image-receipt-override')!;
     const world = await buildWorld(scenario, 'vision-tile-test');

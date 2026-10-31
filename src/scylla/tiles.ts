@@ -9,7 +9,12 @@ export interface VisionTile {
   fullBox: Box;
 }
 
-export async function splitVisionTiles(image: Buffer, lines: RenderedLine[] = []): Promise<VisionTile[]> {
+export async function splitVisionTiles(
+  image: Buffer,
+  lines: RenderedLine[] = [],
+  options: { enhance?: boolean } = {},
+): Promise<VisionTile[]> {
+  const enhance = options.enhance ?? process.env.SCYLLA_VISION_ENHANCE !== '0';
   const metadata = await sharp(image).metadata();
   const width = metadata.width;
   const height = metadata.height;
@@ -25,7 +30,7 @@ export async function splitVisionTiles(image: Buffer, lines: RenderedLine[] = []
     for (const [column, left] of xPositions.entries()) {
       const cropWidth = Math.min(tileWidth, width - left);
       const cropHeight = Math.min(tileHeight, height - top);
-      const scale = Math.min(2, 1536 / Math.max(cropWidth, cropHeight));
+      const scale = Math.min(3, 1536 / Math.max(cropWidth, cropHeight));
       const resizedWidth = Math.max(1, Math.round(cropWidth * scale));
       const resizedHeight = Math.max(1, Math.round(cropHeight * scale));
       const renderedLines = lines.flatMap((line) => {
@@ -49,10 +54,14 @@ export async function splitVisionTiles(image: Buffer, lines: RenderedLine[] = []
           },
         }];
       });
-      const tileImage = await sharp(image)
+      const tile = sharp(image)
         .extract({ left, top, width: cropWidth, height: cropHeight })
+        .normalise();
+      if (enhance) {
+        tile.greyscale().clahe({ width: 64, height: 64, maxSlope: 3 }).linear(1.6, -60);
+      }
+      const tileImage = await tile
         .resize(resizedWidth, resizedHeight, { fit: 'fill' })
-        .normalise()
         .png()
         .toBuffer();
       tiles.push({
